@@ -1,9 +1,15 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, Modal,
+  StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, Modal, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { supabase } from './supabase';
+import type { Session } from '@supabase/supabase-js';
+import Svg, { Path } from 'react-native-svg';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Tipo = 'receita' | 'despesa';
 type Aba = 'lancamentos' | 'resumo' | 'metas' | 'importar';
@@ -35,6 +41,7 @@ const C = {
 
 function fmt(v: number) { return 'R$ ' + Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
 function mesAno(m: number, a: number) { return MESES[m] + ' ' + a; }
+function saudacao() { const h = new Date().getHours(); if (h < 12) return 'Bom dia,'; if (h < 18) return 'Boa tarde,'; return 'Boa noite,'; }
 
 function adivinharCategoria(desc: string): string {
   const d = desc.toUpperCase();
@@ -60,8 +67,118 @@ function parseOFX(conteudo: string): TransacaoOFX[] {
   });
 }
 
+function GraficoPizza({ dados }: { dados: [string, number][] }) {
+  const total = dados.reduce((s, [, v]) => s + v, 0);
+  if (total === 0) return null;
+  const SIZE = 200, R = 80, cx = 100, cy = 100;
+  let ang = -Math.PI / 2;
+  const fatias = dados.map(([cat, val]) => {
+    const sweep = (val / total) * 2 * Math.PI;
+    const x1 = cx + R * Math.cos(ang), y1 = cy + R * Math.sin(ang);
+    ang += sweep;
+    const x2 = cx + R * Math.cos(ang), y2 = cy + R * Math.sin(ang);
+    const large = sweep > Math.PI ? 1 : 0;
+    return { cat, val, color: CORES_CAT[cat] || '#888', d: `M${cx} ${cy} L${x1} ${y1} A${R} ${R} 0 ${large} 1 ${x2} ${y2}Z` };
+  });
+  return (
+    <View style={{ alignItems: 'center', marginBottom: 8 }}>
+      <Svg width={SIZE} height={SIZE}>
+        {fatias.map(f => <Path key={f.cat} d={f.d} fill={f.color} />)}
+      </Svg>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: 8 }}>
+        {fatias.map(f => (
+          <View key={f.cat} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: f.color }} />
+            <Text style={{ fontSize: 12, color: C.label }}>{f.cat} {Math.round(f.val/total*100)}%</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function TelaLogin() {
+  const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
+  const [modo, setModo] = useState<'login' | 'cadastro'>('login');
+  const [carregando, setCarregando] = useState(false);
+
+  async function entrar() {
+    if (!email.trim() || !senha) { Alert.alert('Preencha todos os campos'); return; }
+    setCarregando(true);
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: senha });
+    if (error) Alert.alert('Erro ao entrar', error.message);
+    setCarregando(false);
+  }
+
+  async function cadastrar() {
+    if (!email.trim() || !senha) { Alert.alert('Preencha todos os campos'); return; }
+    if (senha.length < 6) { Alert.alert('Senha fraca', 'A senha deve ter pelo menos 6 caracteres.'); return; }
+    setCarregando(true);
+    const { error } = await supabase.auth.signUp({ email: email.trim(), password: senha });
+    if (error) Alert.alert('Erro ao cadastrar', error.message);
+    else Alert.alert('Conta criada!', 'Verifique seu e-mail para confirmar o cadastro.');
+    setCarregando(false);
+  }
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'center', padding: 24 }}>
+        <View style={{ alignItems: 'center', marginBottom: 40 }}>
+          <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <Text style={{ fontSize: 32 }}>💰</Text>
+          </View>
+          <Text style={{ fontSize: 26, fontWeight: '700', color: C.text }}>Meu Financeiro</Text>
+          <Text style={{ fontSize: 14, color: C.textLight, marginTop: 4 }}>Controle suas finanças com facilidade</Text>
+        </View>
+
+        <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, borderWidth: 0.5, borderColor: C.borderLight }}>
+          <Text style={{ fontSize: 18, fontWeight: '600', color: C.text, marginBottom: 16 }}>
+            {modo === 'login' ? 'Entrar na conta' : 'Criar conta'}
+          </Text>
+          <TextInput
+            style={[sl.input]}
+            placeholder="E-mail"
+            placeholderTextColor={C.textLight}
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <TextInput
+            style={[sl.input]}
+            placeholder="Senha"
+            placeholderTextColor={C.textLight}
+            value={senha}
+            onChangeText={setSenha}
+            secureTextEntry
+          />
+          <TouchableOpacity
+            style={{ backgroundColor: C.primary, borderRadius: 10, padding: 14, alignItems: 'center', opacity: carregando ? 0.6 : 1, marginTop: 4 }}
+            onPress={modo === 'login' ? entrar : cadastrar}
+            disabled={carregando}
+          >
+            {carregando
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>{modo === 'login' ? 'Entrar' : 'Criar conta'}</Text>
+            }
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity style={{ alignItems: 'center', marginTop: 20 }} onPress={() => setModo(modo === 'login' ? 'cadastro' : 'login')}>
+          <Text style={{ color: C.primaryDark, fontSize: 14 }}>
+            {modo === 'login' ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entrar'}
+          </Text>
+        </TouchableOpacity>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
 export default function App() {
   const hoje = new Date();
+  const [session, setSession] = useState<Session | null>(null);
+  const [authCarregando, setAuthCarregando] = useState(true);
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [metas, setMetas] = useState<Meta[]>([]);
   const [recorrentes, setRecorrentes] = useState<Recorrente[]>([]);
@@ -91,8 +208,22 @@ export default function App() {
   const [txOFX, setTxOFX] = useState<TransacaoOFX[]>([]);
   const [arquivoNome, setArquivoNome] = useState('');
   const [salvandoOFX, setSalvandoOFX] = useState(false);
+  const [filtroMes, setFiltroMes] = useState(hoje.getMonth());
+  const [filtroAno, setFiltroAno] = useState(hoje.getFullYear());
+  const [txEditando, setTxEditando] = useState<Transacao | null>(null);
+  const [editDesc, setEditDesc] = useState('');
+  const [editVal, setEditVal] = useState('');
+  const [editTipo, setEditTipo] = useState<Tipo>('despesa');
+  const [editCat, setEditCat] = useState('Alimentação');
+  const [salvandoEdit, setSalvandoEdit] = useState(false);
 
-  useEffect(() => { carregarTudo(); }, []);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); setAuthCarregando(false); });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => { if (session) carregarTudo(); }, [session]);
 
   async function carregarTudo() {
     setCarregando(true);
@@ -107,7 +238,8 @@ export default function App() {
       setRecorrentes(r3.data);
       if (r3.data.length > 0) {
         const chave = `rec_${hoje.getMonth()}_${hoje.getFullYear()}`;
-        if (!localStorage.getItem(chave)) setShowRecModal(true);
+        const visto = await AsyncStorage.getItem(chave);
+        if (!visto) setShowRecModal(true);
       }
     }
     setCarregando(false);
@@ -120,7 +252,7 @@ export default function App() {
       const { data } = await supabase.from('transacoes').insert(ins).select();
       if (data) setTransacoes(prev => [...data, ...prev]);
     }
-    localStorage.setItem(`rec_${hoje.getMonth()}_${hoje.getFullYear()}`, '1');
+    await AsyncStorage.setItem(`rec_${hoje.getMonth()}_${hoje.getFullYear()}`, '1');
     setShowRecModal(false);
   }
 
@@ -144,14 +276,36 @@ export default function App() {
     const v = parseFloat(val.replace(/\./g,'').replace(',','.'));
     if (!desc || isNaN(v) || v <= 0) return;
     setSalvando(true);
-    const { data } = await supabase.from('transacoes').insert({ descricao: desc, valor: v, tipo, categoria: cat, data: hoje.toLocaleDateString('pt-BR') }).select();
-    if (data) { const novas = [data[0], ...transacoes]; setTransacoes(novas); setDesc(''); setVal(''); calcularAlertas(novas, metas); }
-    setSalvando(false);
+  const { data, error } = await supabase.from('transacoes').insert({ descricao: desc, valor: v, tipo, categoria: cat, data: hoje.toLocaleDateString('pt-BR') }).select();
+  if (data) { const novas = [data[0], ...transacoes]; setTransacoes(novas); setDesc(''); setVal(''); calcularAlertas(novas, metas); }
+  setSalvando(false);
   }
-
   async function remover(id: string) {
     await supabase.from('transacoes').delete().eq('id', id);
     const novas = transacoes.filter(t => t.id !== id); setTransacoes(novas); calcularAlertas(novas, metas);
+  }
+
+  function abrirEdicao(t: Transacao) {
+    setTxEditando(t);
+    setEditDesc(t.descricao);
+    setEditVal(String(t.valor).replace('.', ','));
+    setEditTipo(t.tipo);
+    setEditCat(t.categoria);
+  }
+
+  async function salvarEdicao() {
+    if (!txEditando) return;
+    const v = parseFloat(editVal.replace(/\./g,'').replace(',','.'));
+    if (!editDesc.trim() || isNaN(v) || v <= 0) { Alert.alert('Dados inválidos', 'Preencha descrição e valor corretamente.'); return; }
+    setSalvandoEdit(true);
+    const { data, error } = await supabase.from('transacoes').update({ descricao: editDesc.trim(), valor: v, tipo: editTipo, categoria: editCat }).eq('id', txEditando.id).select();
+    if (error) { Alert.alert('Erro ao editar', error.message); }
+    else if (data) {
+      const novas = transacoes.map(t => t.id === txEditando.id ? data[0] : t);
+      setTransacoes(novas); calcularAlertas(novas, metas);
+      setTxEditando(null);
+    }
+    setSalvandoEdit(false);
   }
 
   async function adicionarMeta() {
@@ -191,10 +345,25 @@ export default function App() {
     setSalvandoOFX(false);
   }
 
-  function selecionarOFX() {
-    const input = document.createElement('input'); input.type = 'file'; input.accept = '.ofx,.OFX';
-    input.onchange = async (e: any) => { const f = e.target.files[0]; if (!f) return; setArquivoNome(f.name); setTxOFX(parseOFX(await f.text())); };
-    input.click();
+  async function exportarCSV() {
+    const cab = 'Data,Descrição,Tipo,Categoria,Valor\n';
+    const linhas = transacoes
+      .filter(t => { const p = t.data?.split('/'); return p && parseInt(p[1])-1 === filtroMes && parseInt(p[2]) === filtroAno; })
+      .map(t => `${t.data},"${t.descricao}",${t.tipo},${t.categoria},${t.valor}`)
+      .join('\n');
+    if (!linhas) { Alert.alert('Sem dados', 'Nenhum lançamento no período selecionado.'); return; }
+    const path = FileSystem.documentDirectory + `financeiro_${MESES[filtroMes]}_${filtroAno}.csv`;
+    await FileSystem.writeAsStringAsync(path, cab + linhas, { encoding: FileSystem.EncodingType.UTF8 });
+    await Sharing.shareAsync(path, { mimeType: 'text/csv', dialogTitle: 'Exportar relatório' });
+  }
+
+  async function selecionarOFX() {
+    const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    setArquivoNome(asset.name);
+    const conteudo = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.UTF8 });
+    setTxOFX(parseOFX(conteudo));
   }
 
   function txDoMes(m: number, a: number) { return transacoes.filter(t => { const p = t.data?.split('/'); return p && parseInt(p[1])-1 === m && parseInt(p[2]) === a; }); }
@@ -214,7 +383,11 @@ export default function App() {
   const totalRec = transacoes.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
   const totalDesp = transacoes.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
   const saldoGeral = totalRec - totalDesp;
-  const visiveis = transacoes.filter(t => filtro === 'todas' || t.tipo === filtro);
+  const visiveis = transacoes.filter(t => {
+    const p = t.data?.split('/');
+    const noMes = p && parseInt(p[1])-1 === filtroMes && parseInt(p[2]) === filtroAno;
+    return noMes && (filtro === 'todas' || t.tipo === filtro);
+  });
   const selOFX = txOFX.filter(t => t.selecionada).length;
 
   function getProgMeta(m: Meta) {
@@ -223,8 +396,49 @@ export default function App() {
     return { atual: g, max: m.valor, pct: Math.min(g/m.valor*100,100), ok: g <= m.valor };
   }
 
+  if (authCarregando) return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' }}>
+      <ActivityIndicator size="large" color={C.primary} />
+    </SafeAreaView>
+  );
+
+  if (!session) return <TelaLogin />;
+
   return (
     <SafeAreaView style={s.safe}>
+      <Modal visible={!!txEditando} transparent animationType="slide">
+        <View style={s.modalOverlay}>
+          <View style={s.modalBox}>
+            <Text style={s.modalTitulo}>✏️ Editar lançamento</Text>
+            <TextInput style={s.input} placeholder="Descrição" placeholderTextColor={C.textLight} value={editDesc} onChangeText={setEditDesc}/>
+            <TextInput style={s.input} placeholder="Valor (ex: 2450,00)" placeholderTextColor={C.textLight} value={editVal} onChangeText={setEditVal} keyboardType="decimal-pad"/>
+            <View style={s.row}>
+              <TouchableOpacity style={[s.tipoBtn, editTipo === 'receita' && { backgroundColor: C.receita, borderColor: C.receita }]} onPress={() => setEditTipo('receita')}>
+                <Text style={[s.tipoBtnText, editTipo === 'receita' && { color: '#fff' }]}>Receita</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.tipoBtn, editTipo === 'despesa' && { backgroundColor: C.despesa, borderColor: C.despesa }]} onPress={() => setEditTipo('despesa')}>
+                <Text style={[s.tipoBtnText, editTipo === 'despesa' && { color: '#fff' }]}>Despesa</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[s.catScroll, { marginBottom: 12 }]}>
+              {CATEGORIAS.map(c => (
+                <TouchableOpacity key={c} style={[s.catBtn, editCat === c && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setEditCat(c)}>
+                  <Text style={[s.catBtnText, editCat === c && { color: '#fff' }]}>{ICONES_CAT[c]} {c}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+              <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: C.bgAccent }]} onPress={() => setTxEditando(null)}>
+                <Text style={[s.btnText, { color: C.primaryDark }]}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.btn, { flex: 2, backgroundColor: C.primary, opacity: salvandoEdit ? 0.6 : 1 }]} onPress={salvarEdicao} disabled={salvandoEdit}>
+                <Text style={[s.btnText, { color: '#fff' }]}>{salvandoEdit ? 'Salvando...' : 'Salvar alterações'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={showRecModal} transparent animationType="slide">
         <View style={s.modalOverlay}>
           <View style={s.modalBox}>
@@ -243,7 +457,7 @@ export default function App() {
               ))}
             </ScrollView>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
-              <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: C.bgAccent }]} onPress={() => { localStorage.setItem(`rec_${hoje.getMonth()}_${hoje.getFullYear()}`, '1'); setShowRecModal(false); }}>
+              <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: C.bgAccent }]} onPress={async () => { await AsyncStorage.setItem(`rec_${hoje.getMonth()}_${hoje.getFullYear()}`, '1'); setShowRecModal(false); }}>
                 <Text style={[s.btnText, { color: C.primaryDark }]}>Pular</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[s.btn, { flex: 2, backgroundColor: C.primary }]} onPress={confirmarRecorrentes}>
@@ -275,8 +489,10 @@ export default function App() {
       {aba === 'lancamentos' && (
         <ScrollView style={s.scroll} keyboardShouldPersistTaps="handled">
           <View style={s.pageHeader}>
-            <View><Text style={s.greeting}>Bom dia,</Text><Text style={s.pageTitle}>Minhas Finanças</Text></View>
-            <View style={s.avatar}><Text style={s.avatarText}>B</Text></View>
+            <View><Text style={s.greeting}>{saudacao()}</Text><Text style={s.pageTitle}>Minhas Finanças</Text></View>
+            <TouchableOpacity style={s.avatar} onPress={() => supabase.auth.signOut()}>
+              <Text style={s.avatarText}>↩</Text>
+            </TouchableOpacity>
           </View>
           <View style={s.heroCard}>
             <Text style={s.heroLabel}>Saldo total</Text>
@@ -310,12 +526,22 @@ export default function App() {
               <Text style={[s.btnText, { color: '#fff' }]}>{salvando ? 'Salvando...' : '+ Adicionar'}</Text>
             </TouchableOpacity>
           </View>
-          <View style={s.filtros}>
-            {(['todas','receita','despesa'] as const).map(f => (
-              <TouchableOpacity key={f} style={[s.filtroBtn, filtro === f && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setFiltro(f)}>
-                <Text style={[s.filtroBtnText, filtro === f && { color: '#fff' }]}>{f === 'todas' ? 'Todos' : f === 'receita' ? 'Receitas' : 'Despesas'}</Text>
-              </TouchableOpacity>
-            ))}
+          <View style={s.mesNav}>
+            <TouchableOpacity onPress={() => filtroMes === 0 ? (setFiltroMes(11), setFiltroAno(filtroAno-1)) : setFiltroMes(filtroMes-1)} style={s.mesBtn}><Text style={s.mesBtnText}>‹</Text></TouchableOpacity>
+            <Text style={s.mesTitulo}>{mesAno(filtroMes, filtroAno)}</Text>
+            <TouchableOpacity onPress={() => filtroMes === 11 ? (setFiltroMes(0), setFiltroAno(filtroAno+1)) : setFiltroMes(filtroMes+1)} style={s.mesBtn}><Text style={s.mesBtnText}>›</Text></TouchableOpacity>
+          </View>
+          <View style={[s.filtros, { justifyContent: 'space-between', alignItems: 'center' }]}>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              {(['todas','receita','despesa'] as const).map(f => (
+                <TouchableOpacity key={f} style={[s.filtroBtn, filtro === f && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setFiltro(f)}>
+                  <Text style={[s.filtroBtnText, filtro === f && { color: '#fff' }]}>{f === 'todas' ? 'Todos' : f === 'receita' ? 'Receitas' : 'Despesas'}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity style={[s.filtroBtn, { backgroundColor: C.receita, borderColor: C.receita }]} onPress={exportarCSV}>
+              <Text style={[s.filtroBtnText, { color: '#fff' }]}>📤 CSV</Text>
+            </TouchableOpacity>
           </View>
           {carregando ? <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }}/> :
             visiveis.length === 0 ? <Text style={s.vazio}>Nenhum lançamento ainda.{'\n'}Adicione o primeiro acima! 👆</Text> :
@@ -326,6 +552,7 @@ export default function App() {
                 </View>
                 <View style={s.txInfo}><Text style={s.txDesc}>{t.descricao}</Text><Text style={s.txMeta}>{t.categoria} · {t.data}</Text></View>
                 <Text style={[s.txValor, { color: t.tipo === 'receita' ? C.receita : C.despesa }]}>{t.tipo === 'receita' ? '+' : '-'} {fmt(t.valor)}</Text>
+                <TouchableOpacity onPress={() => abrirEdicao(t)} style={{ padding: 4 }}><Text style={{ fontSize: 15 }}>✏️</Text></TouchableOpacity>
                 <TouchableOpacity onPress={() => remover(t.id)} style={{ padding: 4 }}><Text style={{ color: '#aaa', fontSize: 14 }}>✕</Text></TouchableOpacity>
               </View>
             ))
@@ -374,6 +601,7 @@ export default function App() {
           {cats.length > 0 ? (
             <View style={s.section}>
               <Text style={s.sectionTitulo}>Despesas por categoria</Text>
+              <GraficoPizza dados={cats} />
               {cats.map(([c, v]) => (
                 <View key={c} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
                   <Text style={{ fontSize: 16, width: 24 }}>{ICONES_CAT[c]}</Text>
@@ -544,6 +772,10 @@ export default function App() {
     </SafeAreaView>
   );
 }
+
+const sl = StyleSheet.create({
+  input: { borderWidth: 0.5, borderColor: '#B5D4F4', borderRadius: 10, padding: 12, fontSize: 14, marginBottom: 12, color: '#1a1a18', backgroundColor: '#F7FAFD' },
+});
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F0F5FC' },
