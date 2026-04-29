@@ -6,7 +6,7 @@ import {
 import { supabase } from './supabase';
 import type { Session } from '@supabase/supabase-js';
 import Svg, { Path } from 'react-native-svg';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -56,15 +56,24 @@ function adivinharCategoria(desc: string): string {
 }
 
 function parseOFX(conteudo: string): TransacaoOFX[] {
-  const blocos = conteudo.match(/<STMTTRN>[\s\S]*?<\/STMTTRN>/gi) || [];
+  // suporta XML (com </STMTTRN>) e SGML (sem tag de fechamento)
+  let blocos: string[] = [];
+  const xmlBlocos = conteudo.match(/<STMTTRN>[\s\S]*?<\/STMTTRN>/gi);
+  if (xmlBlocos && xmlBlocos.length > 0) {
+    blocos = xmlBlocos;
+  } else {
+    // SGML: divide pelo início de cada <STMTTRN>
+    const partes = conteudo.split(/<STMTTRN>/i);
+    blocos = partes.slice(1).map(p => '<STMTTRN>' + p.split(/<\/BANKTRANLIST>|<STMTTRN>/i)[0]);
+  }
   return blocos.map((bloco, i) => {
-    const get = (tag: string) => { const m = bloco.match(new RegExp(`<${tag}>(.*?)[\\n<]`, 'i')); return m ? m[1].trim() : ''; };
+    const get = (tag: string) => { const m = bloco.match(new RegExp(`<${tag}>([^<\\n\\r]+)`, 'i')); return m ? m[1].trim() : ''; };
     const valor = parseFloat(get('TRNAMT').replace(',', '.')) || 0;
     const desc = get('MEMO') || get('NAME') || 'Transação';
     const raw = get('DTPOSTED').substring(0, 8);
     const data = raw.length === 8 ? `${raw.substring(6,8)}/${raw.substring(4,6)}/${raw.substring(0,4)}` : new Date().toLocaleDateString('pt-BR');
     return { id: `ofx_${i}_${Date.now()}`, descricao: desc, valor: Math.abs(valor), tipo: valor >= 0 ? 'receita' : 'despesa', categoria: adivinharCategoria(desc), data, selecionada: true };
-  });
+  }).filter(t => t.valor > 0);
 }
 
 function GraficoPizza({ dados }: { dados: [string, number][] }) {
@@ -340,8 +349,17 @@ export default function App() {
     const sel = txOFX.filter(t => t.selecionada);
     if (!sel.length) return;
     setSalvandoOFX(true);
-    const { data } = await supabase.from('transacoes').insert(sel.map(({ id, selecionada, ...r }) => r)).select();
-    if (data) { const novas = [...data, ...transacoes]; setTransacoes(novas); setTxOFX([]); setArquivoNome(''); setAba('lancamentos'); calcularAlertas(novas, metas); }
+    const { data, error } = await supabase.from('transacoes').insert(sel.map(({ id, selecionada, ...r }) => r)).select();
+    if (error) {
+      Alert.alert('Erro ao salvar', error.message);
+    } else if (data && data.length > 0) {
+      const novas = [...data, ...transacoes];
+      setTransacoes(novas);
+      setTxOFX([]);
+      setArquivoNome('');
+      setAba('lancamentos');
+      calcularAlertas(novas, metas);
+    }
     setSalvandoOFX(false);
   }
 
@@ -358,12 +376,27 @@ export default function App() {
   }
 
   async function selecionarOFX() {
-    const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
-    if (result.canceled || !result.assets?.[0]) return;
-    const asset = result.assets[0];
-    setArquivoNome(asset.name);
-    const conteudo = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.UTF8 });
-    setTxOFX(parseOFX(conteudo));
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      setArquivoNome(asset.name);
+      let conteudo = '';
+      try {
+        conteudo = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.UTF8 });
+      } catch {
+        // tenta sem encoding especificado (fallback)
+        conteudo = await FileSystem.readAsStringAsync(asset.uri);
+      }
+      const transacoesOFX = parseOFX(conteudo);
+      if (transacoesOFX.length === 0) {
+        Alert.alert('Arquivo não reconhecido', `Nenhuma transação encontrada.\n\nPrimeiros 200 chars:\n${conteudo.substring(0, 200)}`);
+        return;
+      }
+      setTxOFX(transacoesOFX);
+    } catch (e: any) {
+      Alert.alert('Erro ao ler arquivo', e?.message || String(e));
+    }
   }
 
   function txDoMes(m: number, a: number) { return transacoes.filter(t => { const p = t.data?.split('/'); return p && parseInt(p[1])-1 === m && parseInt(p[2]) === a; }); }
