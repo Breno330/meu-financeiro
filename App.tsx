@@ -8,6 +8,7 @@ import type { Session } from '@supabase/supabase-js';
 import Svg, { Path } from 'react-native-svg';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -375,6 +376,54 @@ export default function App() {
     await Sharing.shareAsync(path, { mimeType: 'text/csv', dialogTitle: 'Exportar relatório' });
   }
 
+  async function exportarPDF() {
+    const txMesFiltro = transacoes.filter(t => { const p = t.data?.split('/'); return p && parseInt(p[1])-1 === filtroMes && parseInt(p[2]) === filtroAno; });
+    if (!txMesFiltro.length) { Alert.alert('Sem dados', 'Nenhum lançamento no período selecionado.'); return; }
+    const totalReceitas = txMesFiltro.filter(t => t.tipo === 'receita').reduce((s, t) => s + t.valor, 0);
+    const totalDespesas = txMesFiltro.filter(t => t.tipo === 'despesa').reduce((s, t) => s + t.valor, 0);
+    const saldo = totalReceitas - totalDespesas;
+    const linhas = txMesFiltro.map(t => `
+      <tr>
+        <td>${t.data}</td>
+        <td>${t.descricao}</td>
+        <td>${ICONES_CAT[t.categoria]} ${t.categoria}</td>
+        <td style="color:${t.tipo === 'receita' ? '#16a34a' : '#dc2626'}">${t.tipo === 'receita' ? '+' : '-'} ${fmt(t.valor)}</td>
+      </tr>`).join('');
+    const html = `
+      <html><head><meta charset="utf-8"/>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 24px; color: #1e293b; }
+        h1 { color: #1d4ed8; font-size: 22px; margin-bottom: 4px; }
+        .periodo { color: #64748b; font-size: 14px; margin-bottom: 20px; }
+        .resumo { display: flex; gap: 16px; margin-bottom: 24px; }
+        .card { flex: 1; padding: 12px 16px; border-radius: 8px; }
+        .card.receita { background: #dcfce7; }
+        .card.despesa { background: #fee2e2; }
+        .card.saldo { background: #dbeafe; }
+        .card label { font-size: 11px; color: #64748b; display: block; }
+        .card span { font-size: 16px; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #1d4ed8; color: white; padding: 8px 10px; text-align: left; }
+        td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; }
+        tr:nth-child(even) td { background: #f8fafc; }
+      </style></head>
+      <body>
+        <h1>Relatório Financeiro</h1>
+        <div class="periodo">${MESES[filtroMes]} de ${filtroAno}</div>
+        <div class="resumo">
+          <div class="card receita"><label>Receitas</label><span>${fmt(totalReceitas)}</span></div>
+          <div class="card despesa"><label>Despesas</label><span>${fmt(totalDespesas)}</span></div>
+          <div class="card saldo"><label>Saldo</label><span style="color:${saldo >= 0 ? '#16a34a' : '#dc2626'}">${fmt(saldo)}</span></div>
+        </div>
+        <table>
+          <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th></tr></thead>
+          <tbody>${linhas}</tbody>
+        </table>
+      </body></html>`;
+    const { uri } = await Print.printToFileAsync({ html });
+    await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Exportar PDF' });
+  }
+
   async function selecionarOFX() {
     try {
       const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
@@ -574,6 +623,9 @@ export default function App() {
             </View>
             <TouchableOpacity style={[s.filtroBtn, { backgroundColor: C.receita, borderColor: C.receita }]} onPress={exportarCSV}>
               <Text style={[s.filtroBtnText, { color: '#fff' }]}>📤 CSV</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.filtroBtn, { backgroundColor: '#dc2626', borderColor: '#dc2626' }]} onPress={exportarPDF}>
+              <Text style={[s.filtroBtnText, { color: '#fff' }]}>📄 PDF</Text>
             </TouchableOpacity>
           </View>
           {carregando ? <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }}/> :
