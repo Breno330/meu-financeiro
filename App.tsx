@@ -31,13 +31,13 @@ const ICONES_CAT: Record<string,string> = {
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 const C = {
-  bg: '#F0F5FC', bgCard: '#FFFFFF', bgAccent: '#E6F1FB',
-  primary: '#378ADD', primaryDark: '#185FA5', primaryDeep: '#0C447C',
-  border: '#B5D4F4', borderLight: '#D6E8F8',
-  receita: '#1D9E75', receitaBg: '#E1F5EE',
-  despesa: '#E24B4A', despesaBg: '#FCEBEB',
-  metaBg: '#EEEDFE', metaBorder: '#7F77DD', metaText: '#3C3489',
-  text: '#1a1a18', label: '#185FA5', textLight: '#5890bb',
+  bg: '#F2F5FA', bgCard: '#FFFFFF', bgAccent: '#EBF2FF',
+  primary: '#2563EB', primaryDark: '#1D4ED8', primaryDeep: '#1E3A8A',
+  border: '#CBD5E1', borderLight: '#E2E8F0',
+  receita: '#059669', receitaBg: '#D1FAE5',
+  despesa: '#DC2626', despesaBg: '#FEE2E2',
+  metaBg: '#EEF2FF', metaBorder: '#818CF8', metaText: '#3730A3',
+  text: '#0F172A', label: '#475569', textLight: '#94A3B8',
 };
 
 function fmt(v: number) { return 'R$ ' + Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
@@ -579,7 +579,7 @@ export default function App() {
           </View>
           <View style={s.heroCard}>
             <Text style={s.heroLabel}>Saldo total</Text>
-            <Text style={[s.heroVal, { color: saldoGeral >= 0 ? C.receita : C.despesa }]}>{fmtSaldo(saldoGeral)}</Text>
+            <Text style={[s.heroVal, { color: saldoGeral >= 0 ? '#FFFFFF' : '#FCA5A5' }]}>{fmtSaldo(saldoGeral)}</Text>
             <View style={s.heroRow}>
               <View><Text style={s.heroSubLabel}>Receitas</Text><Text style={s.heroSubVal}>{fmt(totalRec)}</Text></View>
               <View style={s.heroDivider}/>
@@ -876,13 +876,13 @@ const s = StyleSheet.create({
   pageTitle: { fontSize: 22, fontWeight: '600', color: '#1a1a18' },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#378ADD', alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  heroCard: { backgroundColor: '#378ADD', marginHorizontal: 16, borderRadius: 16, padding: 20, marginBottom: 16 },
-  heroLabel: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginBottom: 6 },
-  heroVal: { fontSize: 34, fontWeight: '600', color: '#fff', letterSpacing: -1, marginBottom: 16 },
-  heroRow: { flexDirection: 'row', alignItems: 'center' },
-  heroSubLabel: { fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 2 },
-  heroSubVal: { fontSize: 15, fontWeight: '500', color: '#fff' },
-  heroDivider: { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.3)', marginHorizontal: 20 },
+  heroCard: { backgroundColor: '#1D4ED8', marginHorizontal: 16, borderRadius: 20, padding: 22, marginBottom: 16, shadowColor: '#1D4ED8', shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
+  heroLabel: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginBottom: 4, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase' },
+  heroVal: { fontSize: 36, fontWeight: '700', color: '#fff', letterSpacing: -1, marginBottom: 18 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, padding: 12 },
+  heroSubLabel: { fontSize: 11, color: 'rgba(255,255,255,0.65)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: 0.3 },
+  heroSubVal: { fontSize: 15, fontWeight: '600', color: '#fff' },
+  heroDivider: { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.25)', marginHorizontal: 20 },
   form: { backgroundColor: '#fff', margin: 16, borderRadius: 14, padding: 16, marginBottom: 8, borderWidth: 0.5, borderColor: '#D6E8F8' },
   formTitulo: { fontSize: 15, fontWeight: '600', marginBottom: 12, color: '#1a1a18' },
   input: { borderWidth: 0.5, borderColor: '#B5D4F4', borderRadius: 10, padding: 10, fontSize: 14, marginBottom: 8, color: '#1a1a18', backgroundColor: '#F7FAFD' },
