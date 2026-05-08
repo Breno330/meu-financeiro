@@ -41,6 +41,7 @@ const C = {
 };
 
 function fmt(v: number) { return 'R$ ' + Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
+function fmtSaldo(v: number) { return (v < 0 ? '-' : '') + 'R$ ' + Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
 function mesAno(m: number, a: number) { return MESES[m] + ' ' + a; }
 function saudacao() { const h = new Date().getHours(); if (h < 12) return 'Bom dia,'; if (h < 18) return 'Boa tarde,'; return 'Boa noite,'; }
 
@@ -413,7 +414,7 @@ export default function App() {
         <div class="resumo">
           <div class="card receita"><label>Receitas</label><span>${fmt(totalReceitas)}</span></div>
           <div class="card despesa"><label>Despesas</label><span>${fmt(totalDespesas)}</span></div>
-          <div class="card saldo"><label>Saldo</label><span style="color:${saldo >= 0 ? '#16a34a' : '#dc2626'}">${fmt(saldo)}</span></div>
+          <div class="card saldo"><label>Saldo</label><span style="color:${saldo >= 0 ? '#16a34a' : '#dc2626'}">${fmtSaldo(saldo)}</span></div>
         </div>
         <table>
           <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th></tr></thead>
@@ -578,7 +579,7 @@ export default function App() {
           </View>
           <View style={s.heroCard}>
             <Text style={s.heroLabel}>Saldo total</Text>
-            <Text style={s.heroVal}>{fmt(saldoGeral)}</Text>
+            <Text style={[s.heroVal, { color: saldoGeral >= 0 ? C.receita : C.despesa }]}>{fmtSaldo(saldoGeral)}</Text>
             <View style={s.heroRow}>
               <View><Text style={s.heroSubLabel}>Receitas</Text><Text style={s.heroSubVal}>{fmt(totalRec)}</Text></View>
               <View style={s.heroDivider}/>
@@ -667,7 +668,7 @@ export default function App() {
             <View style={s.ringItem}>
               <View style={[s.ring, { backgroundColor: C.bgAccent, borderColor: C.primary }]}><Text style={{ fontSize: 16 }}>💰</Text></View>
               <Text style={s.ringLabel}>Saldo</Text>
-              <Text style={[s.ringVal, { color: saldoMes >= 0 ? C.primary : C.despesa }]}>{fmt(saldoMes)}</Text>
+              <Text style={[s.ringVal, { color: saldoMes >= 0 ? C.primary : C.despesa }]}>{fmtSaldo(saldoMes)}</Text>
             </View>
           </View>
           {(receitasMes > 0 || despesasMes > 0) && (
