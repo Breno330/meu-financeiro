@@ -935,7 +935,22 @@ export default function App() {
             </TouchableOpacity>
           </View>
           <View style={s.form}>
-            <Text style={s.formTitulo}>🔄 Despesas recorrentes</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={s.formTitulo}>🔄 Despesas recorrentes</Text>
+              {recorrentes.length > 0 && (
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 10, color: C.textLight, textTransform: 'uppercase', letterSpacing: 0.4 }}>Total mensal</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: C.despesa }}>
+                    {fmt(recorrentes.filter(r => r.tipo === 'despesa').reduce((s, r) => s + Number(r.valor), 0))}
+                  </Text>
+                  {recorrentes.some(r => r.tipo === 'receita') && (
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: C.receita }}>
+                      + {fmt(recorrentes.filter(r => r.tipo === 'receita').reduce((s, r) => s + Number(r.valor), 0))}
+                    </Text>
+                  )}
+                </View>
+              )}
+            </View>
             {recorrentes.length === 0 && (
               <Text style={{ fontSize: 13, color: C.textLight, marginBottom: 12, fontStyle: 'italic' }}>Nenhuma recorrente cadastrada ainda.</Text>
             )}
