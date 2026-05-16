@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, Modal, Alert, KeyboardAvoidingView, Platform,
@@ -21,7 +21,7 @@ type TransacaoOFX = { id: string; descricao: string; valor: number; tipo: Tipo; 
 
 const CATEGORIAS = ['Alimentação','Transporte','Moradia','Saúde','Lazer','Educação','Salário','Outros'];
 const CORES_CAT: Record<string,string> = {
-  Alimentação:'#1D9E75', Transporte:'#378ADD', Moradia:'#BA7517',
+  Alimentação:'#1D9E75', Transporte:'#2563EB', Moradia:'#BA7517',
   Saúde:'#D4537E', Lazer:'#7F77DD', Educação:'#639922', Salário:'#1D9E75', Outros:'#888780',
 };
 const ICONES_CAT: Record<string,string> = {
@@ -58,13 +58,11 @@ function adivinharCategoria(desc: string): string {
 }
 
 function parseOFX(conteudo: string): TransacaoOFX[] {
-  // suporta XML (com </STMTTRN>) e SGML (sem tag de fechamento)
   let blocos: string[] = [];
   const xmlBlocos = conteudo.match(/<STMTTRN>[\s\S]*?<\/STMTTRN>/gi);
   if (xmlBlocos && xmlBlocos.length > 0) {
     blocos = xmlBlocos;
   } else {
-    // SGML: divide pelo início de cada <STMTTRN>
     const partes = conteudo.split(/<STMTTRN>/i);
     blocos = partes.slice(1).map(p => '<STMTTRN>' + p.split(/<\/BANKTRANLIST>|<STMTTRN>/i)[0]);
   }
@@ -227,6 +225,20 @@ export default function App() {
   const [editTipo, setEditTipo] = useState<Tipo>('despesa');
   const [editCat, setEditCat] = useState('Alimentação');
   const [salvandoEdit, setSalvandoEdit] = useState(false);
+  // UX improvements
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
+  const [toastVisible, setToastVisible] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [instrucaoExpandida, setInstrucaoExpandida] = useState(false);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function mostrarToast(msg: string) {
+    setToastMsg(msg);
+    setToastVisible(true);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToastVisible(false), 2500);
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); setAuthCarregando(false); });
@@ -287,13 +299,38 @@ export default function App() {
     const v = parseFloat(val.replace(/\./g,'').replace(',','.'));
     if (!desc || isNaN(v) || v <= 0) return;
     setSalvando(true);
-  const { data, error } = await supabase.from('transacoes').insert({ descricao: desc, valor: v, tipo, categoria: cat, data: hoje.toLocaleDateString('pt-BR') }).select();
-  if (data) { const novas = [data[0], ...transacoes]; setTransacoes(novas); setDesc(''); setVal(''); calcularAlertas(novas, metas); }
-  setSalvando(false);
+    const { data, error } = await supabase.from('transacoes').insert({ descricao: desc, valor: v, tipo, categoria: cat, data: hoje.toLocaleDateString('pt-BR') }).select();
+    if (data) {
+      const novas = [data[0], ...transacoes];
+      setTransacoes(novas);
+      setDesc('');
+      setVal('');
+      calcularAlertas(novas, metas);
+      setShowFormModal(false);
+      mostrarToast('✅ Lançamento adicionado!');
+    }
+    if (error) Alert.alert('Erro ao salvar', error.message);
+    setSalvando(false);
   }
+
   async function remover(id: string) {
-    await supabase.from('transacoes').delete().eq('id', id);
-    const novas = transacoes.filter(t => t.id !== id); setTransacoes(novas); calcularAlertas(novas, metas);
+    Alert.alert(
+      'Excluir lançamento',
+      'Tem certeza que deseja excluir este lançamento?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir', style: 'destructive',
+          onPress: async () => {
+            await supabase.from('transacoes').delete().eq('id', id);
+            const novas = transacoes.filter(t => t.id !== id);
+            setTransacoes(novas);
+            calcularAlertas(novas, metas);
+            mostrarToast('🗑 Lançamento excluído');
+          }
+        }
+      ]
+    );
   }
 
   function abrirEdicao(t: Transacao) {
@@ -315,6 +352,7 @@ export default function App() {
       const novas = transacoes.map(t => t.id === txEditando.id ? data[0] : t);
       setTransacoes(novas); calcularAlertas(novas, metas);
       setTxEditando(null);
+      mostrarToast('✏️ Lançamento atualizado!');
     }
     setSalvandoEdit(false);
   }
@@ -324,13 +362,27 @@ export default function App() {
     if (isNaN(v) || v <= 0) return;
     setSalvandoMeta(true);
     const { data } = await supabase.from('metas').insert({ tipo: metaTipo, categoria: metaTipo === 'categoria' ? metaCat : null, valor: v, mes: hoje.getMonth(), ano: hoje.getFullYear() }).select();
-    if (data) { const novas = [...metas, data[0]]; setMetas(novas); setMetaVal(''); calcularAlertas(transacoes, novas); }
+    if (data) { const novas = [...metas, data[0]]; setMetas(novas); setMetaVal(''); calcularAlertas(transacoes, novas); mostrarToast('🎯 Meta salva!'); }
     setSalvandoMeta(false);
   }
 
   async function removerMeta(id: string) {
-    await supabase.from('metas').delete().eq('id', id);
-    const novas = metas.filter(m => m.id !== id); setMetas(novas); calcularAlertas(transacoes, novas);
+    Alert.alert(
+      'Excluir meta',
+      'Deseja remover esta meta?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir', style: 'destructive',
+          onPress: async () => {
+            await supabase.from('metas').delete().eq('id', id);
+            const novas = metas.filter(m => m.id !== id);
+            setMetas(novas);
+            calcularAlertas(transacoes, novas);
+          }
+        }
+      ]
+    );
   }
 
   async function adicionarRecorrente() {
@@ -338,13 +390,25 @@ export default function App() {
     if (!recDesc || isNaN(v) || v <= 0) return;
     setSalvandoRec(true);
     const { data } = await supabase.from('recorrentes').insert({ descricao: recDesc, valor: v, tipo: recTipo, categoria: recCat, ativo: true }).select();
-    if (data) { setRecorrentes([...recorrentes, data[0]]); setRecDesc(''); setRecVal(''); }
+    if (data) { setRecorrentes([...recorrentes, data[0]]); setRecDesc(''); setRecVal(''); mostrarToast('🔄 Recorrente adicionada!'); }
     setSalvandoRec(false);
   }
 
   async function removerRecorrente(id: string) {
-    await supabase.from('recorrentes').update({ ativo: false }).eq('id', id);
-    setRecorrentes(recorrentes.filter(r => r.id !== id));
+    Alert.alert(
+      'Remover recorrente',
+      'Deseja remover esta despesa recorrente?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Remover', style: 'destructive',
+          onPress: async () => {
+            await supabase.from('recorrentes').update({ ativo: false }).eq('id', id);
+            setRecorrentes(recorrentes.filter(r => r.id !== id));
+          }
+        }
+      ]
+    );
   }
 
   async function salvarOFX() {
@@ -361,11 +425,13 @@ export default function App() {
       setArquivoNome('');
       setAba('lancamentos');
       calcularAlertas(novas, metas);
+      mostrarToast(`✅ ${data.length} transações importadas!`);
     }
     setSalvandoOFX(false);
   }
 
   async function exportarCSV() {
+    setShowExportMenu(false);
     const cab = 'Data,Descrição,Tipo,Categoria,Valor\n';
     const linhas = transacoes
       .filter(t => { const p = t.data?.split('/'); return p && parseInt(p[1])-1 === filtroMes && parseInt(p[2]) === filtroAno; })
@@ -378,6 +444,7 @@ export default function App() {
   }
 
   async function exportarPDF() {
+    setShowExportMenu(false);
     const txMesFiltro = transacoes.filter(t => { const p = t.data?.split('/'); return p && parseInt(p[1])-1 === filtroMes && parseInt(p[2]) === filtroAno; });
     if (!txMesFiltro.length) { Alert.alert('Sem dados', 'Nenhum lançamento no período selecionado.'); return; }
     const totalReceitas = txMesFiltro.filter(t => t.tipo === 'receita').reduce((s, t) => s + t.valor, 0);
@@ -435,7 +502,6 @@ export default function App() {
       try {
         conteudo = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.UTF8 });
       } catch {
-        // tenta sem encoding especificado (fallback)
         conteudo = await FileSystem.readAsStringAsync(asset.uri);
       }
       const transacoesOFX = parseOFX(conteudo);
@@ -465,7 +531,6 @@ export default function App() {
   const metasMes = metas.filter(m => m.mes === hoje.getMonth() && m.ano === hoje.getFullYear());
   const totalRec = transacoes.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
   const totalDesp = transacoes.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
-  const saldoGeral = totalRec - totalDesp;
   const visiveis = transacoes.filter(t => {
     const p = t.data?.split('/');
     const noMes = p && parseInt(p[1])-1 === filtroMes && parseInt(p[2]) === filtroAno;
@@ -489,42 +554,49 @@ export default function App() {
 
   return (
     <SafeAreaView style={s.safe}>
+
+      {/* ── Modal: editar lançamento ── */}
       <Modal visible={!!txEditando} transparent animationType="slide">
         <View style={s.modalOverlay}>
-          <View style={s.modalBox}>
-            <Text style={s.modalTitulo}>✏️ Editar lançamento</Text>
-            <TextInput style={s.input} placeholder="Descrição" placeholderTextColor={C.textLight} value={editDesc} onChangeText={setEditDesc}/>
-            <TextInput style={s.input} placeholder="Valor (ex: 2450,00)" placeholderTextColor={C.textLight} value={editVal} onChangeText={setEditVal} keyboardType="decimal-pad"/>
-            <View style={s.row}>
-              <TouchableOpacity style={[s.tipoBtn, editTipo === 'receita' && { backgroundColor: C.receita, borderColor: C.receita }]} onPress={() => setEditTipo('receita')}>
-                <Text style={[s.tipoBtnText, editTipo === 'receita' && { color: '#fff' }]}>Receita</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.tipoBtn, editTipo === 'despesa' && { backgroundColor: C.despesa, borderColor: C.despesa }]} onPress={() => setEditTipo('despesa')}>
-                <Text style={[s.tipoBtnText, editTipo === 'despesa' && { color: '#fff' }]}>Despesa</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[s.catScroll, { marginBottom: 12 }]}>
-              {CATEGORIAS.map(c => (
-                <TouchableOpacity key={c} style={[s.catBtn, editCat === c && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setEditCat(c)}>
-                  <Text style={[s.catBtnText, editCat === c && { color: '#fff' }]}>{ICONES_CAT[c]} {c}</Text>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={s.modalBox}>
+              <View style={s.modalHandle}/>
+              <Text style={s.modalTitulo}>✏️ Editar lançamento</Text>
+              <TextInput style={s.input} placeholder="Descrição" placeholderTextColor={C.textLight} value={editDesc} onChangeText={setEditDesc}/>
+              <TextInput style={s.input} placeholder="Valor (ex: 2450,00)" placeholderTextColor={C.textLight} value={editVal} onChangeText={setEditVal} keyboardType="decimal-pad"/>
+              <View style={s.row}>
+                <TouchableOpacity style={[s.tipoBtn, editTipo === 'receita' && { backgroundColor: C.receita, borderColor: C.receita }]} onPress={() => setEditTipo('receita')}>
+                  <Text style={[s.tipoBtnText, editTipo === 'receita' && { color: '#fff' }]}>Receita</Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-              <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: C.bgAccent }]} onPress={() => setTxEditando(null)}>
-                <Text style={[s.btnText, { color: C.primaryDark }]}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.btn, { flex: 2, backgroundColor: C.primary, opacity: salvandoEdit ? 0.6 : 1 }]} onPress={salvarEdicao} disabled={salvandoEdit}>
-                <Text style={[s.btnText, { color: '#fff' }]}>{salvandoEdit ? 'Salvando...' : 'Salvar alterações'}</Text>
-              </TouchableOpacity>
+                <TouchableOpacity style={[s.tipoBtn, editTipo === 'despesa' && { backgroundColor: C.despesa, borderColor: C.despesa }]} onPress={() => setEditTipo('despesa')}>
+                  <Text style={[s.tipoBtnText, editTipo === 'despesa' && { color: '#fff' }]}>Despesa</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[s.catScroll, { marginBottom: 12 }]}>
+                {CATEGORIAS.map(c => (
+                  <TouchableOpacity key={c} style={[s.catBtn, editCat === c && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setEditCat(c)}>
+                    <Text style={[s.catBtnText, editCat === c && { color: '#fff' }]}>{ICONES_CAT[c]} {c}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: C.bgAccent }]} onPress={() => setTxEditando(null)}>
+                  <Text style={[s.btnText, { color: C.primaryDark }]}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.btn, { flex: 2, backgroundColor: C.primary, opacity: salvandoEdit ? 0.6 : 1 }]} onPress={salvarEdicao} disabled={salvandoEdit}>
+                  <Text style={[s.btnText, { color: '#fff' }]}>{salvandoEdit ? 'Salvando...' : 'Salvar alterações'}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
+      {/* ── Modal: recorrentes do mês ── */}
       <Modal visible={showRecModal} transparent animationType="slide">
         <View style={s.modalOverlay}>
           <View style={s.modalBox}>
+            <View style={s.modalHandle}/>
             <Text style={s.modalTitulo}>🔄 Recorrentes de {MESES[hoje.getMonth()]}</Text>
             <Text style={s.modalSub}>Selecione quais lançar este mês:</Text>
             <ScrollView style={{ maxHeight: 280 }}>
@@ -551,6 +623,65 @@ export default function App() {
         </View>
       </Modal>
 
+      {/* ── Modal: novo lançamento (FAB) ── */}
+      <Modal visible={showFormModal} transparent animationType="slide">
+        <View style={s.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={s.modalBox}>
+              <View style={s.modalHandle}/>
+              <Text style={s.modalTitulo}>➕ Novo lançamento</Text>
+              <TextInput style={s.input} placeholder="Descrição" placeholderTextColor={C.textLight} value={desc} onChangeText={setDesc}/>
+              <TextInput style={s.input} placeholder="Valor (ex: 2450,00)" placeholderTextColor={C.textLight} value={val} onChangeText={setVal} keyboardType="decimal-pad"/>
+              <View style={s.row}>
+                <TouchableOpacity style={[s.tipoBtn, tipo === 'receita' && { backgroundColor: C.receita, borderColor: C.receita }]} onPress={() => setTipo('receita')}>
+                  <Text style={[s.tipoBtnText, tipo === 'receita' && { color: '#fff' }]}>↑ Receita</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.tipoBtn, tipo === 'despesa' && { backgroundColor: C.despesa, borderColor: C.despesa }]} onPress={() => setTipo('despesa')}>
+                  <Text style={[s.tipoBtnText, tipo === 'despesa' && { color: '#fff' }]}>↓ Despesa</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.catScroll}>
+                {CATEGORIAS.map(c => (
+                  <TouchableOpacity key={c} style={[s.catBtn, cat === c && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setCat(c)}>
+                    <Text style={[s.catBtnText, cat === c && { color: '#fff' }]}>{ICONES_CAT[c]} {c}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: C.bgAccent }]} onPress={() => { setShowFormModal(false); setDesc(''); setVal(''); }}>
+                  <Text style={[s.btnText, { color: C.primaryDark }]}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.btn, { flex: 2, backgroundColor: C.primary, opacity: salvando ? 0.6 : 1 }]} onPress={adicionar} disabled={salvando}>
+                  <Text style={[s.btnText, { color: '#fff' }]}>{salvando ? 'Salvando...' : 'Salvar lançamento'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* ── Modal: exportar ── */}
+      <Modal visible={showExportMenu} transparent animationType="fade">
+        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowExportMenu(false)}>
+          <View style={[s.modalBox, { paddingBottom: 24 }]}>
+            <View style={s.modalHandle}/>
+            <Text style={s.modalTitulo}>📤 Exportar relatório</Text>
+            <Text style={s.modalSub}>{MESES[filtroMes]} de {filtroAno}</Text>
+            <TouchableOpacity style={[s.exportOpcao, { borderColor: C.receita }]} onPress={exportarCSV}>
+              <Text style={{ fontSize: 28, marginBottom: 4 }}>📊</Text>
+              <Text style={[s.exportOpcaoTitulo, { color: C.receita }]}>Planilha CSV</Text>
+              <Text style={s.exportOpcaoSub}>Abrir no Excel ou Google Sheets</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.exportOpcao, { borderColor: C.despesa }]} onPress={exportarPDF}>
+              <Text style={{ fontSize: 28, marginBottom: 4 }}>📄</Text>
+              <Text style={[s.exportOpcaoTitulo, { color: C.despesa }]}>Relatório PDF</Text>
+              <Text style={s.exportOpcaoSub}>Com resumo e tabela completa</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── Alertas ── */}
       {alertas.length > 0 && (
         <TouchableOpacity style={s.alertaBanner} onPress={() => setShowAlertas(!showAlertas)}>
           <Text style={s.alertaBannerText}>🚨 {alertas.length} alerta{alertas.length > 1 ? 's' : ''} — toque para ver</Text>
@@ -558,17 +689,7 @@ export default function App() {
       )}
       {showAlertas && alertas.map((a, i) => <Text key={i} style={s.alertaItem}>{a}</Text>)}
 
-      <View style={s.abas}>
-        {(['lancamentos','resumo','metas','importar'] as Aba[]).map(a => (
-          <TouchableOpacity key={a} style={[s.aba, aba === a && s.abaAtiva]} onPress={() => setAba(a)}>
-            <Text style={[s.abaText, aba === a && s.abaTextAtiva]}>
-              {a === 'lancamentos' ? '📋' : a === 'resumo' ? '📊' : a === 'metas' ? '🎯' : '📥'}
-              {' '}{a === 'lancamentos' ? 'Início' : a === 'resumo' ? 'Resumo' : a === 'metas' ? `Metas${alertas.length > 0 ? ' 🔴' : ''}` : 'OFX'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
+      {/* ── Aba: Início ── */}
       {aba === 'lancamentos' && (
         <ScrollView style={s.scroll} keyboardShouldPersistTaps="handled">
           <View style={s.pageHeader}>
@@ -577,43 +698,31 @@ export default function App() {
               <Text style={s.avatarText}>↩</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Hero — saldo do mês atual */}
           <View style={s.heroCard}>
-            <Text style={s.heroLabel}>Saldo total</Text>
-            <Text style={[s.heroVal, { color: saldoGeral >= 0 ? '#FFFFFF' : '#FCA5A5' }]}>{fmtSaldo(saldoGeral)}</Text>
+            <Text style={s.heroLabel}>Saldo de {MESES[hoje.getMonth()]}</Text>
+            <Text style={[s.heroVal, { color: saldoAtual >= 0 ? '#FFFFFF' : '#FCA5A5' }]}>{fmtSaldo(saldoAtual)}</Text>
             <View style={s.heroRow}>
-              <View><Text style={s.heroSubLabel}>Receitas</Text><Text style={s.heroSubVal}>{fmt(totalRec)}</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.heroSubLabel}>Receitas</Text>
+                <Text style={s.heroSubVal}>{fmt(recAtual)}</Text>
+              </View>
               <View style={s.heroDivider}/>
-              <View><Text style={s.heroSubLabel}>Despesas</Text><Text style={s.heroSubVal}>{fmt(totalDesp)}</Text></View>
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <Text style={s.heroSubLabel}>Despesas</Text>
+                <Text style={s.heroSubVal}>{fmt(despAtual)}</Text>
+              </View>
             </View>
           </View>
-          <View style={s.form}>
-            <Text style={s.formTitulo}>Novo lançamento</Text>
-            <TextInput style={s.input} placeholder="Descrição" placeholderTextColor={C.textLight} value={desc} onChangeText={setDesc}/>
-            <TextInput style={s.input} placeholder="Valor (ex: 2450,00)" placeholderTextColor={C.textLight} value={val} onChangeText={setVal} keyboardType="decimal-pad"/>
-            <View style={s.row}>
-              <TouchableOpacity style={[s.tipoBtn, tipo === 'receita' && { backgroundColor: C.receita, borderColor: C.receita }]} onPress={() => setTipo('receita')}>
-                <Text style={[s.tipoBtnText, tipo === 'receita' && { color: '#fff' }]}>Receita</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.tipoBtn, tipo === 'despesa' && { backgroundColor: C.despesa, borderColor: C.despesa }]} onPress={() => setTipo('despesa')}>
-                <Text style={[s.tipoBtnText, tipo === 'despesa' && { color: '#fff' }]}>Despesa</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.catScroll}>
-              {CATEGORIAS.map(c => (
-                <TouchableOpacity key={c} style={[s.catBtn, cat === c && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setCat(c)}>
-                  <Text style={[s.catBtnText, cat === c && { color: '#fff' }]}>{ICONES_CAT[c]} {c}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity style={[s.btn, { backgroundColor: C.primary, opacity: salvando ? 0.6 : 1 }]} onPress={adicionar} disabled={salvando}>
-              <Text style={[s.btnText, { color: '#fff' }]}>{salvando ? 'Salvando...' : '+ Adicionar'}</Text>
-            </TouchableOpacity>
-          </View>
+
+          {/* Filtros de mês e tipo */}
           <View style={s.mesNav}>
             <TouchableOpacity onPress={() => filtroMes === 0 ? (setFiltroMes(11), setFiltroAno(filtroAno-1)) : setFiltroMes(filtroMes-1)} style={s.mesBtn}><Text style={s.mesBtnText}>‹</Text></TouchableOpacity>
             <Text style={s.mesTitulo}>{mesAno(filtroMes, filtroAno)}</Text>
             <TouchableOpacity onPress={() => filtroMes === 11 ? (setFiltroMes(0), setFiltroAno(filtroAno+1)) : setFiltroMes(filtroMes+1)} style={s.mesBtn}><Text style={s.mesBtnText}>›</Text></TouchableOpacity>
           </View>
+
           <View style={[s.filtros, { justifyContent: 'space-between', alignItems: 'center' }]}>
             <View style={{ flexDirection: 'row', gap: 6 }}>
               {(['todas','receita','despesa'] as const).map(f => (
@@ -622,15 +731,21 @@ export default function App() {
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={[s.filtroBtn, { backgroundColor: C.receita, borderColor: C.receita }]} onPress={exportarCSV}>
-              <Text style={[s.filtroBtnText, { color: '#fff' }]}>📤 CSV</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[s.filtroBtn, { backgroundColor: '#dc2626', borderColor: '#dc2626' }]} onPress={exportarPDF}>
-              <Text style={[s.filtroBtnText, { color: '#fff' }]}>📄 PDF</Text>
+            <TouchableOpacity style={[s.filtroBtn, { backgroundColor: C.primaryDark, borderColor: C.primaryDark }]} onPress={() => setShowExportMenu(true)}>
+              <Text style={[s.filtroBtnText, { color: '#fff' }]}>📤 Exportar</Text>
             </TouchableOpacity>
           </View>
-          {carregando ? <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }}/> :
-            visiveis.length === 0 ? <Text style={s.vazio}>Nenhum lançamento ainda.{'\n'}Adicione o primeiro acima! 👆</Text> :
+
+          {/* Lista de transações */}
+          {carregando ? (
+            <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }}/>
+          ) : visiveis.length === 0 ? (
+            <View style={s.vazioContainer}>
+              <Text style={s.vazioEmoji}>💸</Text>
+              <Text style={s.vazioTitulo}>Nenhum lançamento</Text>
+              <Text style={s.vazioSub}>Toque no botão <Text style={{ fontWeight: '700', color: C.primary }}>+</Text> para adicionar sua primeira transação de {MESES[filtroMes]}.</Text>
+            </View>
+          ) : (
             visiveis.map(t => (
               <View key={t.id} style={s.txItem}>
                 <View style={[s.txIcone, { backgroundColor: t.tipo === 'receita' ? C.receitaBg : C.despesaBg }]}>
@@ -639,14 +754,15 @@ export default function App() {
                 <View style={s.txInfo}><Text style={s.txDesc}>{t.descricao}</Text><Text style={s.txMeta}>{t.categoria} · {t.data}</Text></View>
                 <Text style={[s.txValor, { color: t.tipo === 'receita' ? C.receita : C.despesa }]}>{t.tipo === 'receita' ? '+' : '-'} {fmt(t.valor)}</Text>
                 <TouchableOpacity onPress={() => abrirEdicao(t)} style={{ padding: 4 }}><Text style={{ fontSize: 15 }}>✏️</Text></TouchableOpacity>
-                <TouchableOpacity onPress={() => remover(t.id)} style={{ padding: 4 }}><Text style={{ color: '#aaa', fontSize: 14 }}>✕</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => remover(t.id)} style={{ padding: 4 }}><Text style={{ color: C.textLight, fontSize: 14 }}>✕</Text></TouchableOpacity>
               </View>
             ))
-          }
-          <View style={{ height: 40 }}/>
+          )}
+          <View style={{ height: 100 }}/>
         </ScrollView>
       )}
 
+      {/* ── Aba: Resumo ── */}
       {aba === 'resumo' && (
         <ScrollView style={s.scroll}>
           <View style={s.mesNav}>
@@ -699,7 +815,13 @@ export default function App() {
                 </View>
               ))}
             </View>
-          ) : <Text style={s.vazio}>Nenhuma despesa em {mesAno(mesSel, anoSel)}.</Text>}
+          ) : (
+            <View style={s.vazioContainer}>
+              <Text style={s.vazioEmoji}>📊</Text>
+              <Text style={s.vazioTitulo}>Sem despesas</Text>
+              <Text style={s.vazioSub}>Nenhuma despesa registrada em {mesAno(mesSel, anoSel)}.</Text>
+            </View>
+          )}
           {txMes.length > 0 && (
             <View style={s.section}>
               <Text style={s.sectionTitulo}>Lançamentos ({txMes.length})</Text>
@@ -712,10 +834,11 @@ export default function App() {
               ))}
             </View>
           )}
-          <View style={{ height: 40 }}/>
+          <View style={{ height: 100 }}/>
         </ScrollView>
       )}
 
+      {/* ── Aba: Metas ── */}
       {aba === 'metas' && (
         <ScrollView style={s.scroll} keyboardShouldPersistTaps="handled">
           <View style={s.pageHeader}>
@@ -731,7 +854,7 @@ export default function App() {
                   <View key={m.id} style={s.metaItem}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                       <Text style={s.metaLabel}>{m.tipo === 'saldo' ? '💰 Meta de saldo' : `${ICONES_CAT[m.categoria||'']} Limite ${m.categoria}`}</Text>
-                      <TouchableOpacity onPress={() => removerMeta(m.id)}><Text style={{ color: '#aaa', fontSize: 14 }}>✕</Text></TouchableOpacity>
+                      <TouchableOpacity onPress={() => removerMeta(m.id)}><Text style={{ color: C.textLight, fontSize: 14 }}>✕</Text></TouchableOpacity>
                     </View>
                     <View style={{ height: 10, backgroundColor: C.bgAccent, borderRadius: 5, overflow: 'hidden' }}>
                       <View style={{ height: 10, borderRadius: 5, width: `${p.pct}%` as any, backgroundColor: p.ok ? C.receita : C.despesa }}/>
@@ -772,12 +895,15 @@ export default function App() {
           </View>
           <View style={s.form}>
             <Text style={s.formTitulo}>🔄 Despesas recorrentes</Text>
+            {recorrentes.length === 0 && (
+              <Text style={{ fontSize: 13, color: C.textLight, marginBottom: 12, fontStyle: 'italic' }}>Nenhuma recorrente cadastrada ainda.</Text>
+            )}
             {recorrentes.map(r => (
               <View key={r.id} style={[s.txItem, { marginHorizontal: 0, marginBottom: 6 }]}>
                 <View style={[s.txIcone, { backgroundColor: r.tipo === 'receita' ? C.receitaBg : C.despesaBg }]}><Text style={{ fontSize: 14 }}>{ICONES_CAT[r.categoria]}</Text></View>
                 <View style={s.txInfo}><Text style={s.txDesc}>{r.descricao}</Text><Text style={s.txMeta}>{r.categoria}</Text></View>
                 <Text style={[s.txValor, { color: r.tipo === 'receita' ? C.receita : C.despesa }]}>{fmt(r.valor)}</Text>
-                <TouchableOpacity onPress={() => removerRecorrente(r.id)} style={{ padding: 4 }}><Text style={{ color: '#aaa', fontSize: 14 }}>✕</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => removerRecorrente(r.id)} style={{ padding: 4 }}><Text style={{ color: C.textLight, fontSize: 14 }}>✕</Text></TouchableOpacity>
               </View>
             ))}
             <TextInput style={s.input} placeholder="Descrição (ex: Aluguel)" placeholderTextColor={C.textLight} value={recDesc} onChangeText={setRecDesc}/>
@@ -793,25 +919,43 @@ export default function App() {
               <Text style={[s.btnText, { color: '#fff' }]}>{salvandoRec ? 'Salvando...' : '+ Adicionar recorrente'}</Text>
             </TouchableOpacity>
           </View>
-          <View style={{ height: 40 }}/>
+          <View style={{ height: 100 }}/>
         </ScrollView>
       )}
 
+      {/* ── Aba: Extrato (OFX) ── */}
       {aba === 'importar' && (
         <ScrollView style={s.scroll}>
           <View style={s.pageHeader}>
-            <View><Text style={s.greeting}>Importe seu extrato</Text><Text style={s.pageTitle}>Importar OFX</Text></View>
+            <View><Text style={s.greeting}>Importe seu extrato</Text><Text style={s.pageTitle}>Importar Extrato</Text></View>
             <View style={[s.avatar, { backgroundColor: C.bgAccent }]}><Text style={[s.avatarText, { color: C.primaryDark }]}>📥</Text></View>
           </View>
-          <View style={[s.infoBox]}>
-            <Text style={s.infoTitulo}>📱 Como exportar do Nubank</Text>
-            {['1. Abra o app do Nubank','2. Vá em Extrato','3. Toque nos três pontinhos (···)','4. Selecione "Exportar extrato"','5. Escolha o formato OFX','6. Salve e importe aqui'].map((l,i) => <Text key={i} style={s.infoTexto}>{l}</Text>)}
-          </View>
+
+          {/* Instruções colapsáveis */}
+          <TouchableOpacity style={s.infoBox} onPress={() => setInstrucaoExpandida(!instrucaoExpandida)} activeOpacity={0.8}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={s.infoTitulo}>📱 Como exportar do Nubank</Text>
+              <Text style={{ fontSize: 18, color: C.primaryDark }}>{instrucaoExpandida ? '▲' : '▼'}</Text>
+            </View>
+            {instrucaoExpandida && (
+              <View style={{ marginTop: 10 }}>
+                {['1. Abra o app do Nubank','2. Vá em Extrato','3. Toque nos três pontinhos (···)','4. Selecione "Exportar extrato"','5. Escolha o formato OFX','6. Salve e importe aqui'].map((l,i) => <Text key={i} style={s.infoTexto}>{l}</Text>)}
+              </View>
+            )}
+          </TouchableOpacity>
+
           {txOFX.length === 0 && (
             <TouchableOpacity style={[s.btn, { backgroundColor: C.primary, margin: 16, padding: 18, flexDirection: 'row', justifyContent: 'center', gap: 10 }]} onPress={selecionarOFX}>
               <Text style={{ fontSize: 20 }}>📂</Text>
               <Text style={[s.btnText, { color: '#fff', fontSize: 15 }]}>Selecionar arquivo .OFX</Text>
             </TouchableOpacity>
+          )}
+          {txOFX.length === 0 && (
+            <View style={s.vazioContainer}>
+              <Text style={s.vazioEmoji}>📂</Text>
+              <Text style={s.vazioTitulo}>Nenhum arquivo carregado</Text>
+              <Text style={s.vazioSub}>Selecione um arquivo .OFX exportado do seu banco para importar as transações automaticamente.</Text>
+            </View>
           )}
           {txOFX.length > 0 && (
             <>
@@ -852,83 +996,159 @@ export default function App() {
               </TouchableOpacity>
             </>
           )}
-          <View style={{ height: 60 }}/>
+          <View style={{ height: 100 }}/>
         </ScrollView>
       )}
+
+      {/* ── FAB ── */}
+      <TouchableOpacity style={s.fab} onPress={() => setShowFormModal(true)} activeOpacity={0.85}>
+        <Text style={s.fabText}>＋</Text>
+      </TouchableOpacity>
+
+      {/* ── Toast ── */}
+      {toastVisible && (
+        <View style={s.toast} pointerEvents="none">
+          <Text style={s.toastText}>{toastMsg}</Text>
+        </View>
+      )}
+
+      {/* ── Tab bar (bottom) ── */}
+      <View style={s.tabBar}>
+        {([
+          { key: 'lancamentos', icon: '🏠', label: 'Início' },
+          { key: 'resumo',      icon: '📊', label: 'Resumo' },
+          { key: 'metas',       icon: '🎯', label: alertas.length > 0 ? 'Metas 🔴' : 'Metas' },
+          { key: 'importar',    icon: '📥', label: 'Extrato' },
+        ] as { key: Aba; icon: string; label: string }[]).map(item => (
+          <TouchableOpacity
+            key={item.key}
+            style={[s.tabItem, aba === item.key && s.tabItemAtivo]}
+            onPress={() => setAba(item.key)}
+          >
+            <Text style={s.tabIcon}>{item.icon}</Text>
+            <Text style={[s.tabLabel, aba === item.key && s.tabLabelAtivo]}>{item.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
     </SafeAreaView>
   );
 }
 
 const sl = StyleSheet.create({
-  input: { borderWidth: 0.5, borderColor: '#B5D4F4', borderRadius: 10, padding: 12, fontSize: 14, marginBottom: 12, color: '#1a1a18', backgroundColor: '#F7FAFD' },
+  input: { borderWidth: 0.5, borderColor: C.border, borderRadius: 10, padding: 12, fontSize: 14, marginBottom: 12, color: C.text, backgroundColor: C.bg },
 });
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F0F5FC' },
+  safe: { flex: 1, backgroundColor: C.bg },
   scroll: { flex: 1 },
-  abas: { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 0.5, borderBottomColor: '#B5D4F4' },
-  aba: { flex: 1, paddingVertical: 11, alignItems: 'center' },
-  abaAtiva: { borderBottomWidth: 2, borderBottomColor: '#378ADD' },
-  abaText: { fontSize: 11, color: '#5890bb' },
-  abaTextAtiva: { color: '#185FA5', fontWeight: '600' },
+
+  // Tab bar (bottom)
+  tabBar: { flexDirection: 'row', backgroundColor: C.bgCard, borderTopWidth: 0.5, borderTopColor: C.borderLight, paddingBottom: Platform.OS === 'ios' ? 0 : 4, paddingTop: 6 },
+  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 4 },
+  tabItemAtivo: { borderTopWidth: 2, borderTopColor: C.primary, marginTop: -6, paddingTop: 10 },
+  tabIcon: { fontSize: 20, marginBottom: 2 },
+  tabLabel: { fontSize: 10, color: C.textLight },
+  tabLabelAtivo: { color: C.primary, fontWeight: '600' },
+
+  // FAB
+  fab: { position: 'absolute', right: 20, bottom: 72, width: 56, height: 56, borderRadius: 28, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', shadowColor: C.primaryDeep, shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  fabText: { fontSize: 28, color: '#fff', lineHeight: 34, marginTop: -2 },
+
+  // Toast
+  toast: { position: 'absolute', bottom: 90, alignSelf: 'center', backgroundColor: C.primaryDeep, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 24, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
+  toastText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+
+  // Page headers
   pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingBottom: 12 },
-  greeting: { fontSize: 13, color: '#185FA5' },
-  pageTitle: { fontSize: 22, fontWeight: '600', color: '#1a1a18' },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#378ADD', alignItems: 'center', justifyContent: 'center' },
+  greeting: { fontSize: 13, color: C.primaryDark },
+  pageTitle: { fontSize: 22, fontWeight: '600', color: C.text },
+  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  heroCard: { backgroundColor: '#1D4ED8', marginHorizontal: 16, borderRadius: 20, padding: 22, marginBottom: 16, shadowColor: '#1D4ED8', shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
+
+  // Hero card
+  heroCard: { backgroundColor: C.primaryDark, marginHorizontal: 16, borderRadius: 20, padding: 22, marginBottom: 16, shadowColor: C.primaryDark, shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   heroLabel: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginBottom: 4, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase' },
   heroVal: { fontSize: 36, fontWeight: '700', color: '#fff', letterSpacing: -1, marginBottom: 18 },
   heroRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, padding: 12 },
   heroSubLabel: { fontSize: 11, color: 'rgba(255,255,255,0.65)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: 0.3 },
   heroSubVal: { fontSize: 15, fontWeight: '600', color: '#fff' },
   heroDivider: { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.25)', marginHorizontal: 20 },
-  form: { backgroundColor: '#fff', margin: 16, borderRadius: 14, padding: 16, marginBottom: 8, borderWidth: 0.5, borderColor: '#D6E8F8' },
-  formTitulo: { fontSize: 15, fontWeight: '600', marginBottom: 12, color: '#1a1a18' },
-  input: { borderWidth: 0.5, borderColor: '#B5D4F4', borderRadius: 10, padding: 10, fontSize: 14, marginBottom: 8, color: '#1a1a18', backgroundColor: '#F7FAFD' },
+
+  // Forms
+  form: { backgroundColor: C.bgCard, margin: 16, borderRadius: 14, padding: 16, marginBottom: 8, borderWidth: 0.5, borderColor: C.borderLight },
+  formTitulo: { fontSize: 15, fontWeight: '600', marginBottom: 12, color: C.text },
+  input: { borderWidth: 0.5, borderColor: C.border, borderRadius: 10, padding: 10, fontSize: 14, marginBottom: 8, color: C.text, backgroundColor: C.bg },
   row: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  tipoBtn: { flex: 1, borderWidth: 1, borderColor: '#B5D4F4', borderRadius: 10, padding: 10, alignItems: 'center', backgroundColor: '#F7FAFD' },
-  tipoBtnText: { fontSize: 13, fontWeight: '500', color: '#185FA5' },
+  tipoBtn: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 10, alignItems: 'center', backgroundColor: C.bg },
+  tipoBtnText: { fontSize: 13, fontWeight: '500', color: C.primaryDark },
   catScroll: { marginBottom: 12 },
-  catBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99, borderWidth: 0.5, borderColor: '#B5D4F4', marginRight: 6, backgroundColor: '#F0F5FC' },
-  catBtnText: { fontSize: 12, color: '#185FA5' },
+  catBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99, borderWidth: 0.5, borderColor: C.border, marginRight: 6, backgroundColor: C.bg },
+  catBtnText: { fontSize: 12, color: C.primaryDark },
   btn: { borderRadius: 10, padding: 12, alignItems: 'center' },
   btnText: { fontSize: 14, fontWeight: '600' },
+
+  // Filters
   filtros: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, marginBottom: 8 },
-  filtroBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 0.5, borderColor: '#B5D4F4', backgroundColor: '#fff' },
-  filtroBtnText: { fontSize: 13, color: '#185FA5' },
-  txItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 6, borderRadius: 12, padding: 12, gap: 10, borderWidth: 0.5, borderColor: '#D6E8F8' },
+  filtroBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 0.5, borderColor: C.border, backgroundColor: C.bgCard },
+  filtroBtnText: { fontSize: 13, color: C.primaryDark },
+
+  // Transaction list
+  txItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard, marginHorizontal: 16, marginBottom: 6, borderRadius: 12, padding: 12, gap: 10, borderWidth: 0.5, borderColor: C.borderLight },
   txIcone: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   txInfo: { flex: 1 },
-  txDesc: { fontSize: 14, fontWeight: '500', color: '#1a1a18' },
-  txMeta: { fontSize: 12, color: '#185FA5', marginTop: 2 },
+  txDesc: { fontSize: 14, fontWeight: '500', color: C.text },
+  txMeta: { fontSize: 12, color: C.primaryDark, marginTop: 2 },
   txValor: { fontSize: 14, fontWeight: '600' },
-  vazio: { textAlign: 'center', color: '#5890bb', fontSize: 14, marginTop: 40, lineHeight: 24, paddingHorizontal: 20 },
+
+  // Empty state
+  vazioContainer: { alignItems: 'center', paddingHorizontal: 32, paddingVertical: 40 },
+  vazioEmoji: { fontSize: 48, marginBottom: 12 },
+  vazioTitulo: { fontSize: 16, fontWeight: '600', color: C.text, marginBottom: 6 },
+  vazioSub: { fontSize: 14, color: C.textLight, textAlign: 'center', lineHeight: 22 },
+
+  // Month nav
   mesNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 16 },
-  mesBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 0.5, borderColor: '#B5D4F4' },
-  mesBtnText: { fontSize: 22, color: '#378ADD', lineHeight: 26 },
-  mesTitulo: { fontSize: 18, fontWeight: '600', color: '#1a1a18', textTransform: 'capitalize' },
+  mesBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.bgCard, alignItems: 'center', justifyContent: 'center', borderWidth: 0.5, borderColor: C.border },
+  mesBtnText: { fontSize: 22, color: C.primary, lineHeight: 26 },
+  mesTitulo: { fontSize: 18, fontWeight: '600', color: C.text, textTransform: 'capitalize' },
+
+  // Charts/rings
   ringRow: { flexDirection: 'row', justifyContent: 'center', gap: 24, paddingHorizontal: 16, marginBottom: 16 },
   ringItem: { alignItems: 'center' },
   ring: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', borderWidth: 2.5, marginBottom: 6 },
-  ringLabel: { fontSize: 11, color: '#185FA5', marginBottom: 2 },
+  ringLabel: { fontSize: 11, color: C.primaryDark, marginBottom: 2 },
   ringVal: { fontSize: 13, fontWeight: '600' },
-  section: { backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 12, borderRadius: 14, padding: 16, borderWidth: 0.5, borderColor: '#D6E8F8' },
-  sectionTitulo: { fontSize: 15, fontWeight: '600', color: '#1a1a18', marginBottom: 14 },
+  section: { backgroundColor: C.bgCard, marginHorizontal: 16, marginBottom: 12, borderRadius: 14, padding: 16, borderWidth: 0.5, borderColor: C.borderLight },
+  sectionTitulo: { fontSize: 15, fontWeight: '600', color: C.text, marginBottom: 14 },
   barComp: { flexDirection: 'row', height: 14, borderRadius: 7, overflow: 'hidden', marginBottom: 4 },
   barSeg: { height: 14 },
-  metaItem: { backgroundColor: '#F7FAFD', borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 0.5, borderColor: '#D6E8F8' },
-  metaLabel: { fontSize: 14, fontWeight: '600', color: '#1a1a18' },
+
+  // Goals
+  metaItem: { backgroundColor: C.bg, borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 0.5, borderColor: C.borderLight },
+  metaLabel: { fontSize: 14, fontWeight: '600', color: C.text },
+
+  // Alerts
   alertaBanner: { backgroundColor: '#E24B4A', padding: 10, alignItems: 'center' },
   alertaBannerText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   alertaItem: { fontSize: 13, color: '#A32D2D', lineHeight: 22, paddingHorizontal: 16, paddingVertical: 4, backgroundColor: '#FCEBEB' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalBox: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, borderTopWidth: 0.5, borderTopColor: '#B5D4F4' },
-  modalTitulo: { fontSize: 18, fontWeight: '600', color: '#1a1a18', marginBottom: 4 },
-  modalSub: { fontSize: 13, color: '#185FA5', marginBottom: 12 },
-  recItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#D6E8F8', borderRadius: 8 },
-  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: '#B5D4F4', alignItems: 'center', justifyContent: 'center' },
-  infoBox: { margin: 16, borderRadius: 12, padding: 16, marginBottom: 8, backgroundColor: '#E6F1FB', borderWidth: 0.5, borderColor: '#B5D4F4' },
-  infoTitulo: { fontSize: 14, fontWeight: '600', marginBottom: 10, color: '#0C447C' },
-  infoTexto: { fontSize: 13, lineHeight: 22, color: '#185FA5' },
+
+  // Modals
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modalBox: { backgroundColor: C.bgCard, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, borderTopWidth: 0.5, borderTopColor: C.borderLight },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.borderLight, alignSelf: 'center', marginBottom: 16 },
+  modalTitulo: { fontSize: 18, fontWeight: '600', color: C.text, marginBottom: 4 },
+  modalSub: { fontSize: 13, color: C.primaryDark, marginBottom: 12 },
+  recItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: C.borderLight, borderRadius: 8 },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+
+  // Export modal
+  exportOpcao: { borderWidth: 1.5, borderRadius: 14, padding: 16, marginBottom: 10, alignItems: 'center' },
+  exportOpcaoTitulo: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
+  exportOpcaoSub: { fontSize: 12, color: C.textLight },
+
+  // OFX info box
+  infoBox: { margin: 16, borderRadius: 12, padding: 16, marginBottom: 8, backgroundColor: C.bgAccent, borderWidth: 0.5, borderColor: C.border },
+  infoTitulo: { fontSize: 14, fontWeight: '600', color: C.primaryDeep },
+  infoTexto: { fontSize: 13, lineHeight: 22, color: C.primaryDark },
 });
