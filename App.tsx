@@ -16,7 +16,7 @@ type Tipo = 'receita' | 'despesa';
 type Aba = 'lancamentos' | 'resumo' | 'metas' | 'importar';
 type Transacao = { id: string; descricao: string; valor: number; tipo: Tipo; categoria: string; data: string; criado_em?: string; };
 type Meta = { id: string; tipo: 'saldo' | 'categoria'; categoria?: string; valor: number; mes: number; ano: number; };
-type Recorrente = { id: string; descricao: string; valor: number; tipo: Tipo; categoria: string; ativo: boolean; };
+type Recorrente = { id: string; descricao: string; valor: number; tipo: Tipo; categoria: string; ativo: boolean; parcelas_total?: number | null; parcelas_restantes?: number | null; };
 type TransacaoOFX = { id: string; descricao: string; valor: number; tipo: Tipo; categoria: string; data: string; selecionada: boolean; };
 
 const CATEGORIAS = ['Alimentação','Transporte','Moradia','Saúde','Lazer','Educação','Salário','Outros'];
@@ -212,6 +212,8 @@ export default function App() {
   const [recTipo, setRecTipo] = useState<Tipo>('despesa');
   const [recCat, setRecCat] = useState('Alimentação');
   const [salvandoRec, setSalvandoRec] = useState(false);
+  const [recEhParcelado, setRecEhParcelado] = useState(false);
+  const [recParcelas, setRecParcelas] = useState('');
   const [txOFX, setTxOFX] = useState<TransacaoOFX[]>([]);
   const [arquivoNome, setArquivoNome] = useState('');
   const [salvandoOFX, setSalvandoOFX] = useState(false);
@@ -312,25 +314,44 @@ export default function App() {
     setRecorrentes(todasRec);
 
     // Auto-lança recorrentes se nenhuma delas já existir no mês atual
-    // (verificação no próprio banco — não depende de AsyncStorage)
     if (todasRec.length > 0) {
       const mesStr = String(hoje.getMonth() + 1).padStart(2, '0');
       const anoStr = String(hoje.getFullYear());
-      const descRec = new Set(todasRec.map(r => r.descricao.toLowerCase().trim()));
-      const jaExisteNoMes = todasTx.some(t => {
-        const p = t.data?.split('/');
-        return p && p[1] === mesStr && p[2] === anoStr && descRec.has(t.descricao.toLowerCase().trim());
-      });
-      if (!jaExisteNoMes) {
-        const ins = todasRec.map(r => ({
-          descricao: r.descricao, valor: r.valor, tipo: r.tipo,
-          categoria: r.categoria,
-          data: `01/${mesStr}/${anoStr}`,
-        }));
-        const { data: inseridas } = await supabase.from('transacoes').insert(ins).select();
-        if (inseridas && inseridas.length > 0) {
-          todasTx = [...inseridas, ...todasTx];
-          mostrarToast(`🔄 ${inseridas.length} recorrente${inseridas.length > 1 ? 's lançadas' : ' lançada'} automaticamente`);
+      // Dedup: considera descrição base (antes do " (X/Y)") para evitar falsos negativos
+      const txMesDesc = todasTx
+        .filter(t => { const p = t.data?.split('/'); return p && p[1] === mesStr && p[2] === anoStr; })
+        .map(t => t.descricao.toLowerCase().trim().replace(/\s*\(\d+\/\d+\)$/, ''));
+      const descMesSet = new Set(txMesDesc);
+      const paraInserir = todasRec.filter(r => !descMesSet.has(r.descricao.toLowerCase().trim()));
+
+      if (paraInserir.length > 0) {
+        const novasTx: Transacao[] = [];
+        for (const r of paraInserir) {
+          // Monta descrição com número da parcela se for parcelado
+          let descricao = r.descricao;
+          if (r.parcelas_total && r.parcelas_restantes) {
+            const atual = r.parcelas_total - r.parcelas_restantes + 1;
+            descricao = `${r.descricao} (${atual}/${r.parcelas_total})`;
+          }
+          const { data: ins } = await supabase.from('transacoes').insert({
+            descricao, valor: r.valor, tipo: r.tipo,
+            categoria: r.categoria, data: `01/${mesStr}/${anoStr}`,
+          }).select();
+          if (ins?.[0]) novasTx.push(ins[0]);
+
+          // Atualiza parcelas restantes
+          if (r.parcelas_restantes != null) {
+            const restantes = r.parcelas_restantes - 1;
+            if (restantes <= 0) {
+              await supabase.from('recorrentes').update({ ativo: false }).eq('id', r.id);
+            } else {
+              await supabase.from('recorrentes').update({ parcelas_restantes: restantes }).eq('id', r.id);
+            }
+          }
+        }
+        if (novasTx.length > 0) {
+          todasTx = [...novasTx, ...todasTx];
+          mostrarToast(`🔄 ${novasTx.length} recorrente${novasTx.length > 1 ? 's lançadas' : ' lançada'} automaticamente`);
         }
       }
     }
@@ -449,9 +470,21 @@ export default function App() {
   async function adicionarRecorrente() {
     const v = parseFloat(recVal.replace(/\./g,'').replace(',','.'));
     if (!recDesc || isNaN(v) || v <= 0) return;
+    const parcTotal = recEhParcelado ? parseInt(recParcelas) : null;
+    if (recEhParcelado && (!parcTotal || parcTotal < 2)) {
+      Alert.alert('Parcelas inválidas', 'Informe ao menos 2 parcelas.');
+      return;
+    }
     setSalvandoRec(true);
-    const { data } = await supabase.from('recorrentes').insert({ descricao: recDesc, valor: v, tipo: recTipo, categoria: recCat, ativo: true }).select();
-    if (data) { setRecorrentes([...recorrentes, data[0]]); setRecDesc(''); setRecVal(''); mostrarToast('🔄 Recorrente adicionada!'); }
+    const { data } = await supabase.from('recorrentes').insert({
+      descricao: recDesc, valor: v, tipo: recTipo, categoria: recCat, ativo: true,
+      parcelas_total: parcTotal, parcelas_restantes: parcTotal,
+    }).select();
+    if (data) {
+      setRecorrentes([...recorrentes, data[0]]);
+      setRecDesc(''); setRecVal(''); setRecParcelas(''); setRecEhParcelado(false);
+      mostrarToast('🔄 Recorrente adicionada!');
+    }
     setSalvandoRec(false);
   }
 
@@ -957,22 +990,55 @@ export default function App() {
             {recorrentes.map(r => (
               <View key={r.id} style={[s.txItem, { marginHorizontal: 0, marginBottom: 6 }]}>
                 <View style={[s.txIcone, { backgroundColor: r.tipo === 'receita' ? C.receitaBg : C.despesaBg }]}><Text style={{ fontSize: 14 }}>{ICONES_CAT[r.categoria]}</Text></View>
-                <View style={s.txInfo}><Text style={s.txDesc}>{r.descricao}</Text><Text style={s.txMeta}>{r.categoria}</Text></View>
+                <View style={s.txInfo}>
+                  <Text style={s.txDesc}>{r.descricao}</Text>
+                  <Text style={s.txMeta}>
+                    {r.categoria}
+                    {r.parcelas_total ? `  ·  ${r.parcelas_restantes}/${r.parcelas_total} parcelas restantes` : '  ·  Mensal'}
+                  </Text>
+                  {r.parcelas_total && (
+                    <View style={{ height: 4, backgroundColor: C.borderLight, borderRadius: 2, marginTop: 5, overflow: 'hidden' }}>
+                      <View style={{ height: 4, borderRadius: 2, backgroundColor: C.primary, width: `${Math.round(((r.parcelas_total - (r.parcelas_restantes ?? 0)) / r.parcelas_total) * 100)}%` as any }}/>
+                    </View>
+                  )}
+                </View>
                 <Text style={[s.txValor, { color: r.tipo === 'receita' ? C.receita : C.despesa }]}>{fmt(r.valor)}</Text>
                 <TouchableOpacity onPress={() => removerRecorrente(r.id)} style={{ padding: 4 }}><Text style={{ color: C.textLight, fontSize: 14 }}>✕</Text></TouchableOpacity>
               </View>
             ))}
-            <TextInput style={s.input} placeholder="Descrição (ex: Aluguel)" placeholderTextColor={C.textLight} value={recDesc} onChangeText={setRecDesc}/>
+            <TextInput style={s.input} placeholder="Descrição (ex: Celular Samsung)" placeholderTextColor={C.textLight} value={recDesc} onChangeText={setRecDesc}/>
             <TextInput style={s.input} placeholder="Valor (ex: 1500,00)" placeholderTextColor={C.textLight} value={recVal} onChangeText={setRecVal} keyboardType="decimal-pad"/>
             <View style={s.row}>
               <TouchableOpacity style={[s.tipoBtn, recTipo === 'despesa' && { backgroundColor: C.despesa, borderColor: C.despesa }]} onPress={() => setRecTipo('despesa')}><Text style={[s.tipoBtnText, recTipo === 'despesa' && { color: '#fff' }]}>Despesa</Text></TouchableOpacity>
               <TouchableOpacity style={[s.tipoBtn, recTipo === 'receita' && { backgroundColor: C.receita, borderColor: C.receita }]} onPress={() => setRecTipo('receita')}><Text style={[s.tipoBtnText, recTipo === 'receita' && { color: '#fff' }]}>Receita</Text></TouchableOpacity>
             </View>
+
+            {/* Toggle parcelado */}
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}
+              onPress={() => { setRecEhParcelado(!recEhParcelado); setRecParcelas(''); }}
+            >
+              <View style={{ width: 40, height: 22, borderRadius: 11, backgroundColor: recEhParcelado ? C.primary : C.borderLight, justifyContent: 'center', paddingHorizontal: 2 }}>
+                <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#fff', alignSelf: recEhParcelado ? 'flex-end' : 'flex-start', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 2, elevation: 2 }}/>
+              </View>
+              <Text style={{ fontSize: 13, color: C.label }}>É parcelado?</Text>
+            </TouchableOpacity>
+            {recEhParcelado && (
+              <TextInput
+                style={[s.input, { borderColor: C.primary }]}
+                placeholder="Número de parcelas (ex: 12)"
+                placeholderTextColor={C.textLight}
+                value={recParcelas}
+                onChangeText={setRecParcelas}
+                keyboardType="number-pad"
+              />
+            )}
+
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.catScroll}>
               {CATEGORIAS.map(c => <TouchableOpacity key={c} style={[s.catBtn, recCat === c && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setRecCat(c)}><Text style={[s.catBtnText, recCat === c && { color: '#fff' }]}>{ICONES_CAT[c]} {c}</Text></TouchableOpacity>)}
             </ScrollView>
             <TouchableOpacity style={[s.btn, { backgroundColor: C.primary, opacity: salvandoRec ? 0.6 : 1 }]} onPress={adicionarRecorrente} disabled={salvandoRec}>
-              <Text style={[s.btnText, { color: '#fff' }]}>{salvandoRec ? 'Salvando...' : '+ Adicionar recorrente'}</Text>
+              <Text style={[s.btnText, { color: '#fff' }]}>{salvandoRec ? 'Salvando...' : `+ Adicionar ${recEhParcelado ? `(${recParcelas || '?'}x)` : 'recorrente'}`}</Text>
             </TouchableOpacity>
           </View>
           <View style={{ height: 100 }}/>
