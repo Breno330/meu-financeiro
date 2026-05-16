@@ -203,8 +203,6 @@ export default function App() {
   const [anoSel, setAnoSel] = useState(hoje.getFullYear());
   const [alertas, setAlertas] = useState<string[]>([]);
   const [showAlertas, setShowAlertas] = useState(false);
-  const [showRecModal, setShowRecModal] = useState(false);
-  const [recConfirmadas, setRecConfirmadas] = useState<Set<string>>(new Set());
   const [metaTipo, setMetaTipo] = useState<'saldo' | 'categoria'>('saldo');
   const [metaCat, setMetaCat] = useState('Alimentação');
   const [metaVal, setMetaVal] = useState('');
@@ -255,28 +253,36 @@ export default function App() {
       supabase.from('metas').select('*'),
       supabase.from('recorrentes').select('*').eq('ativo', true),
     ]);
-    if (r1.data) setTransacoes(r1.data);
-    if (r2.data) setMetas(r2.data);
-    if (r3.data) {
-      setRecorrentes(r3.data);
-      if (r3.data.length > 0) {
-        const chave = `rec_${hoje.getMonth()}_${hoje.getFullYear()}`;
-        const visto = await AsyncStorage.getItem(chave);
-        if (!visto) setShowRecModal(true);
+
+    let todasTx: Transacao[] = r1.data || [];
+    const todasMetas = r2.data || [];
+    const todasRec = r3.data || [];
+
+    setMetas(todasMetas);
+    setRecorrentes(todasRec);
+
+    // Auto-lança recorrentes no primeiro acesso de cada mês
+    if (todasRec.length > 0) {
+      const chave = `rec_${hoje.getMonth()}_${hoje.getFullYear()}`;
+      const visto = await AsyncStorage.getItem(chave);
+      if (!visto) {
+        const ins = todasRec.map(r => ({
+          descricao: r.descricao, valor: r.valor, tipo: r.tipo,
+          categoria: r.categoria,
+          data: `01/${String(hoje.getMonth() + 1).padStart(2, '0')}/${hoje.getFullYear()}`,
+        }));
+        const { data: inseridas } = await supabase.from('transacoes').insert(ins).select();
+        if (inseridas && inseridas.length > 0) {
+          todasTx = [...inseridas, ...todasTx];
+          mostrarToast(`🔄 ${inseridas.length} recorrente${inseridas.length > 1 ? 's lançadas' : ' lançada'} automaticamente`);
+        }
+        await AsyncStorage.setItem(chave, '1');
       }
     }
-    setCarregando(false);
-  }
 
-  async function confirmarRecorrentes() {
-    const sel = recorrentes.filter(r => recConfirmadas.has(r.id));
-    if (sel.length > 0) {
-      const ins = sel.map(r => ({ descricao: r.descricao, valor: r.valor, tipo: r.tipo, categoria: r.categoria, data: `01/${String(hoje.getMonth()+1).padStart(2,'0')}/${hoje.getFullYear()}` }));
-      const { data } = await supabase.from('transacoes').insert(ins).select();
-      if (data) setTransacoes(prev => [...data, ...prev]);
-    }
-    await AsyncStorage.setItem(`rec_${hoje.getMonth()}_${hoje.getFullYear()}`, '1');
-    setShowRecModal(false);
+    setTransacoes(todasTx);
+    calcularAlertas(todasTx, todasMetas);
+    setCarregando(false);
   }
 
   function calcularAlertas(txs: Transacao[], mts: Meta[]) {
@@ -592,36 +598,6 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* ── Modal: recorrentes do mês ── */}
-      <Modal visible={showRecModal} transparent animationType="slide">
-        <View style={s.modalOverlay}>
-          <View style={s.modalBox}>
-            <View style={s.modalHandle}/>
-            <Text style={s.modalTitulo}>🔄 Recorrentes de {MESES[hoje.getMonth()]}</Text>
-            <Text style={s.modalSub}>Selecione quais lançar este mês:</Text>
-            <ScrollView style={{ maxHeight: 280 }}>
-              {recorrentes.map(r => (
-                <TouchableOpacity key={r.id} style={[s.recItem, recConfirmadas.has(r.id) && { backgroundColor: C.bgAccent }]}
-                  onPress={() => setRecConfirmadas(prev => { const n = new Set(prev); n.has(r.id) ? n.delete(r.id) : n.add(r.id); return n; })}>
-                  <View style={[s.checkbox, recConfirmadas.has(r.id) && { backgroundColor: C.primary, borderColor: C.primary }]}>
-                    {recConfirmadas.has(r.id) && <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>✓</Text>}
-                  </View>
-                  <View style={{ flex: 1 }}><Text style={s.txDesc}>{r.descricao}</Text><Text style={s.txMeta}>{r.categoria}</Text></View>
-                  <Text style={[s.txValor, { color: r.tipo === 'receita' ? C.receita : C.despesa }]}>{fmt(r.valor)}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
-              <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: C.bgAccent }]} onPress={async () => { await AsyncStorage.setItem(`rec_${hoje.getMonth()}_${hoje.getFullYear()}`, '1'); setShowRecModal(false); }}>
-                <Text style={[s.btnText, { color: C.primaryDark }]}>Pular</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.btn, { flex: 2, backgroundColor: C.primary }]} onPress={confirmarRecorrentes}>
-                <Text style={[s.btnText, { color: '#fff' }]}>Lançar {recConfirmadas.size}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* ── Modal: novo lançamento (FAB) ── */}
       <Modal visible={showFormModal} transparent animationType="slide">
