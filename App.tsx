@@ -225,11 +225,61 @@ export default function App() {
   const [salvandoEdit, setSalvandoEdit] = useState(false);
   // UX improvements
   const [showFormModal, setShowFormModal] = useState(false);
+  const [limpandoDupl, setLimpandoDupl] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [instrucaoExpandida, setInstrucaoExpandida] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function limparDuplicatas() {
+    setLimpandoDupl(true);
+    const mesStr = String(hoje.getMonth() + 1).padStart(2, '0');
+    const anoStr = String(hoje.getFullYear());
+    const dataAlvo = `01/${mesStr}/${anoStr}`;
+    const descRec = new Set(recorrentes.map(r => r.descricao.toLowerCase().trim()));
+    // Encontra pares duplicados: mesma descrição + mesmo mês → mantém o mais antigo, apaga o mais recente
+    const candidatas = transacoes.filter(t =>
+      t.data === dataAlvo && descRec.has(t.descricao.toLowerCase().trim())
+    );
+    // Agrupa por descrição
+    const porDesc: Record<string, Transacao[]> = {};
+    candidatas.forEach(t => {
+      const k = t.descricao.toLowerCase().trim();
+      porDesc[k] = [...(porDesc[k] || []), t];
+    });
+    const idsApagar: string[] = [];
+    Object.values(porDesc).forEach(grupo => {
+      if (grupo.length > 1) {
+        // Apaga todos exceto o primeiro (mais antigo pelo criado_em)
+        const ordenados = [...grupo].sort((a, b) => (a.criado_em || '') < (b.criado_em || '') ? -1 : 1);
+        ordenados.slice(1).forEach(t => idsApagar.push(t.id));
+      }
+    });
+    if (idsApagar.length === 0) {
+      Alert.alert('Nenhuma duplicata', 'Não foram encontradas transações duplicadas neste mês.');
+      setLimpandoDupl(false);
+      return;
+    }
+    Alert.alert(
+      `Remover ${idsApagar.length} duplicata${idsApagar.length > 1 ? 's' : ''}`,
+      `Foram encontradas ${idsApagar.length} transação(ões) duplicadas com data 01/${mesStr}/${anoStr}. Deseja removê-las?`,
+      [
+        { text: 'Cancelar', style: 'cancel', onPress: () => setLimpandoDupl(false) },
+        {
+          text: 'Remover', style: 'destructive',
+          onPress: async () => {
+            await supabase.from('transacoes').delete().in('id', idsApagar);
+            const novas = transacoes.filter(t => !idsApagar.includes(t.id));
+            setTransacoes(novas);
+            calcularAlertas(novas, metas);
+            mostrarToast(`🗑 ${idsApagar.length} duplicata${idsApagar.length > 1 ? 's removidas' : ' removida'}!`);
+            setLimpandoDupl(false);
+          }
+        }
+      ]
+    );
+  }
 
   function mostrarToast(msg: string) {
     setToastMsg(msg);
@@ -266,15 +316,26 @@ export default function App() {
       const chave = `rec_${hoje.getMonth()}_${hoje.getFullYear()}`;
       const visto = await AsyncStorage.getItem(chave);
       if (!visto) {
-        const ins = todasRec.map(r => ({
-          descricao: r.descricao, valor: r.valor, tipo: r.tipo,
-          categoria: r.categoria,
-          data: `01/${String(hoje.getMonth() + 1).padStart(2, '0')}/${hoje.getFullYear()}`,
-        }));
-        const { data: inseridas } = await supabase.from('transacoes').insert(ins).select();
-        if (inseridas && inseridas.length > 0) {
-          todasTx = [...inseridas, ...todasTx];
-          mostrarToast(`🔄 ${inseridas.length} recorrente${inseridas.length > 1 ? 's lançadas' : ' lançada'} automaticamente`);
+        // Filtra apenas as que ainda NÃO existem no mês (evita duplicatas)
+        const mesStr = String(hoje.getMonth() + 1).padStart(2, '0');
+        const anoStr = String(hoje.getFullYear());
+        const descJaNoMes = new Set(
+          todasTx
+            .filter(t => { const p = t.data?.split('/'); return p && p[1] === mesStr && p[2] === anoStr; })
+            .map(t => t.descricao.toLowerCase().trim())
+        );
+        const paraInserir = todasRec.filter(r => !descJaNoMes.has(r.descricao.toLowerCase().trim()));
+        if (paraInserir.length > 0) {
+          const ins = paraInserir.map(r => ({
+            descricao: r.descricao, valor: r.valor, tipo: r.tipo,
+            categoria: r.categoria,
+            data: `01/${mesStr}/${anoStr}`,
+          }));
+          const { data: inseridas } = await supabase.from('transacoes').insert(ins).select();
+          if (inseridas && inseridas.length > 0) {
+            todasTx = [...inseridas, ...todasTx];
+            mostrarToast(`🔄 ${inseridas.length} recorrente${inseridas.length > 1 ? 's lançadas' : ' lançada'} automaticamente`);
+          }
         }
         await AsyncStorage.setItem(chave, '1');
       }
@@ -823,6 +884,14 @@ export default function App() {
             <View><Text style={s.greeting}>Acompanhe seus</Text><Text style={s.pageTitle}>Metas & Alertas</Text></View>
             <View style={[s.avatar, { backgroundColor: C.metaBg }]}><Text style={[s.avatarText, { color: C.metaText }]}>🎯</Text></View>
           </View>
+          <TouchableOpacity
+            style={[s.btn, { margin: 16, marginBottom: 4, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#F59E0B', opacity: limpandoDupl ? 0.6 : 1 }]}
+            onPress={limparDuplicatas}
+            disabled={limpandoDupl}
+          >
+            <Text style={[s.btnText, { color: '#92400E' }]}>🧹 Remover lançamentos duplicados deste mês</Text>
+          </TouchableOpacity>
+
           {metasMes.length > 0 && (
             <View style={s.section}>
               <Text style={s.sectionTitulo}>Metas de {MESES[hoje.getMonth()]}</Text>
