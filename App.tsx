@@ -879,11 +879,11 @@ export default function App() {
             <View style={[s.avatar, { backgroundColor: C.metaBg }]}><Text style={[s.avatarText, { color: C.metaText }]}>🎯</Text></View>
           </View>
           <TouchableOpacity
-            style={[s.btn, { margin: 16, marginBottom: 4, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#F59E0B', opacity: limpandoDupl ? 0.6 : 1 }]}
+            style={{ alignSelf: 'center', marginTop: 8, marginBottom: 4, opacity: limpandoDupl ? 0.4 : 1 }}
             onPress={limparDuplicatas}
             disabled={limpandoDupl}
           >
-            <Text style={[s.btnText, { color: '#92400E' }]}>🧹 Remover lançamentos duplicados deste mês</Text>
+            <Text style={{ fontSize: 11, color: C.textLight }}>🧹 remover duplicatas do mês</Text>
           </TouchableOpacity>
 
           {metasMes.length > 0 && (
