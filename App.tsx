@@ -45,6 +45,17 @@ function fmtSaldo(v: number) { return (v < 0 ? '-' : '') + 'R$ ' + Math.abs(v).t
 function mesAno(m: number, a: number) { return MESES[m] + ' ' + a; }
 function saudacao() { const h = new Date().getHours(); if (h < 12) return 'Bom dia,'; if (h < 18) return 'Boa tarde,'; return 'Boa noite,'; }
 
+function confirmar(titulo: string, mensagem: string, onConfirm: () => void) {
+  if (Platform.OS === 'web') {
+    if (window.confirm(`${titulo}\n\n${mensagem}`)) onConfirm();
+  } else {
+    Alert.alert(titulo, mensagem, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Confirmar', style: 'destructive', onPress: onConfirm },
+    ]);
+  }
+}
+
 function adivinharCategoria(desc: string): string {
   const d = desc.toUpperCase();
   if (d.match(/IFOOD|RAPPI|RESTAURANTE|MERCADO|SUPERMERCADO|PADARIA|ACAI|PIZZA|BURGER|CAFE/)) return 'Alimentação';
@@ -263,23 +274,17 @@ export default function App() {
       setLimpandoDupl(false);
       return;
     }
-    Alert.alert(
+    confirmar(
       `Remover ${idsApagar.length} duplicata${idsApagar.length > 1 ? 's' : ''}`,
       `Foram encontradas ${idsApagar.length} transação(ões) duplicadas com data 01/${mesStr}/${anoStr}. Deseja removê-las?`,
-      [
-        { text: 'Cancelar', style: 'cancel', onPress: () => setLimpandoDupl(false) },
-        {
-          text: 'Remover', style: 'destructive',
-          onPress: async () => {
-            await supabase.from('transacoes').delete().in('id', idsApagar);
-            const novas = transacoes.filter(t => !idsApagar.includes(t.id));
-            setTransacoes(novas);
-            calcularAlertas(novas, metas);
-            mostrarToast(`🗑 ${idsApagar.length} duplicata${idsApagar.length > 1 ? 's removidas' : ' removida'}!`);
-            setLimpandoDupl(false);
-          }
-        }
-      ]
+      async () => {
+        await supabase.from('transacoes').delete().in('id', idsApagar);
+        const novas = transacoes.filter(t => !idsApagar.includes(t.id));
+        setTransacoes(novas);
+        calcularAlertas(novas, metas);
+        mostrarToast(`🗑 ${idsApagar.length} duplicata${idsApagar.length > 1 ? 's removidas' : ' removida'}!`);
+        setLimpandoDupl(false);
+      }
     );
   }
 
@@ -396,23 +401,13 @@ export default function App() {
   }
 
   async function remover(id: string) {
-    Alert.alert(
-      'Excluir lançamento',
-      'Tem certeza que deseja excluir este lançamento?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir', style: 'destructive',
-          onPress: async () => {
-            await supabase.from('transacoes').delete().eq('id', id);
-            const novas = transacoes.filter(t => t.id !== id);
-            setTransacoes(novas);
-            calcularAlertas(novas, metas);
-            mostrarToast('🗑 Lançamento excluído');
-          }
-        }
-      ]
-    );
+    confirmar('Excluir lançamento', 'Tem certeza que deseja excluir este lançamento?', async () => {
+      await supabase.from('transacoes').delete().eq('id', id);
+      const novas = transacoes.filter(t => t.id !== id);
+      setTransacoes(novas);
+      calcularAlertas(novas, metas);
+      mostrarToast('🗑 Lançamento excluído');
+    });
   }
 
   function abrirEdicao(t: Transacao) {
@@ -449,22 +444,12 @@ export default function App() {
   }
 
   async function removerMeta(id: string) {
-    Alert.alert(
-      'Excluir meta',
-      'Deseja remover esta meta?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir', style: 'destructive',
-          onPress: async () => {
-            await supabase.from('metas').delete().eq('id', id);
-            const novas = metas.filter(m => m.id !== id);
-            setMetas(novas);
-            calcularAlertas(transacoes, novas);
-          }
-        }
-      ]
-    );
+    confirmar('Excluir meta', 'Deseja remover esta meta?', async () => {
+      await supabase.from('metas').delete().eq('id', id);
+      const novas = metas.filter(m => m.id !== id);
+      setMetas(novas);
+      calcularAlertas(transacoes, novas);
+    });
   }
 
   async function adicionarRecorrente() {
@@ -489,20 +474,11 @@ export default function App() {
   }
 
   async function removerRecorrente(id: string) {
-    Alert.alert(
-      'Remover recorrente',
-      'Deseja remover esta despesa recorrente?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Remover', style: 'destructive',
-          onPress: async () => {
-            await supabase.from('recorrentes').update({ ativo: false }).eq('id', id);
-            setRecorrentes(recorrentes.filter(r => r.id !== id));
-          }
-        }
-      ]
-    );
+    confirmar('Remover recorrente', 'Deseja remover esta despesa recorrente?', async () => {
+      await supabase.from('recorrentes').update({ ativo: false }).eq('id', id);
+      setRecorrentes(recorrentes.filter(r => r.id !== id));
+      mostrarToast('🗑 Recorrente removida');
+    });
   }
 
   async function salvarOFX() {
