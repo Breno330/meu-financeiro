@@ -311,33 +311,27 @@ export default function App() {
     setMetas(todasMetas);
     setRecorrentes(todasRec);
 
-    // Auto-lança recorrentes no primeiro acesso de cada mês
+    // Auto-lança recorrentes se nenhuma delas já existir no mês atual
+    // (verificação no próprio banco — não depende de AsyncStorage)
     if (todasRec.length > 0) {
-      const chave = `rec_${hoje.getMonth()}_${hoje.getFullYear()}`;
-      const visto = await AsyncStorage.getItem(chave);
-      if (!visto) {
-        // Filtra apenas as que ainda NÃO existem no mês (evita duplicatas)
-        const mesStr = String(hoje.getMonth() + 1).padStart(2, '0');
-        const anoStr = String(hoje.getFullYear());
-        const descJaNoMes = new Set(
-          todasTx
-            .filter(t => { const p = t.data?.split('/'); return p && p[1] === mesStr && p[2] === anoStr; })
-            .map(t => t.descricao.toLowerCase().trim())
-        );
-        const paraInserir = todasRec.filter(r => !descJaNoMes.has(r.descricao.toLowerCase().trim()));
-        if (paraInserir.length > 0) {
-          const ins = paraInserir.map(r => ({
-            descricao: r.descricao, valor: r.valor, tipo: r.tipo,
-            categoria: r.categoria,
-            data: `01/${mesStr}/${anoStr}`,
-          }));
-          const { data: inseridas } = await supabase.from('transacoes').insert(ins).select();
-          if (inseridas && inseridas.length > 0) {
-            todasTx = [...inseridas, ...todasTx];
-            mostrarToast(`🔄 ${inseridas.length} recorrente${inseridas.length > 1 ? 's lançadas' : ' lançada'} automaticamente`);
-          }
+      const mesStr = String(hoje.getMonth() + 1).padStart(2, '0');
+      const anoStr = String(hoje.getFullYear());
+      const descRec = new Set(todasRec.map(r => r.descricao.toLowerCase().trim()));
+      const jaExisteNoMes = todasTx.some(t => {
+        const p = t.data?.split('/');
+        return p && p[1] === mesStr && p[2] === anoStr && descRec.has(t.descricao.toLowerCase().trim());
+      });
+      if (!jaExisteNoMes) {
+        const ins = todasRec.map(r => ({
+          descricao: r.descricao, valor: r.valor, tipo: r.tipo,
+          categoria: r.categoria,
+          data: `01/${mesStr}/${anoStr}`,
+        }));
+        const { data: inseridas } = await supabase.from('transacoes').insert(ins).select();
+        if (inseridas && inseridas.length > 0) {
+          todasTx = [...inseridas, ...todasTx];
+          mostrarToast(`🔄 ${inseridas.length} recorrente${inseridas.length > 1 ? 's lançadas' : ' lançada'} automaticamente`);
         }
-        await AsyncStorage.setItem(chave, '1');
       }
     }
 
