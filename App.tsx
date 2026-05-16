@@ -21,8 +21,8 @@ type TransacaoOFX = { id: string; descricao: string; valor: number; tipo: Tipo; 
 
 const CATEGORIAS = ['Alimentação','Transporte','Moradia','Saúde','Lazer','Educação','Salário','Outros'];
 const CORES_CAT: Record<string,string> = {
-  Alimentação:'#1D9E75', Transporte:'#2563EB', Moradia:'#BA7517',
-  Saúde:'#D4537E', Lazer:'#7F77DD', Educação:'#639922', Salário:'#1D9E75', Outros:'#888780',
+  Alimentação:'#059669', Transporte:'#0891B2', Moradia:'#D97706',
+  Saúde:'#DB2777', Lazer:'#7C3AED', Educação:'#16A34A', Salário:'#059669', Outros:'#64748B',
 };
 const ICONES_CAT: Record<string,string> = {
   Alimentação:'🍽', Transporte:'🚗', Moradia:'🏠', Saúde:'💊',
@@ -31,13 +31,13 @@ const ICONES_CAT: Record<string,string> = {
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 const C = {
-  bg: '#F2F5FA', bgCard: '#FFFFFF', bgAccent: '#EBF2FF',
-  primary: '#2563EB', primaryDark: '#1D4ED8', primaryDeep: '#1E3A8A',
-  border: '#CBD5E1', borderLight: '#E2E8F0',
+  bg: '#FAFAF8', bgCard: '#FFFFFF', bgAccent: '#EEF2FF',
+  primary: '#4F46E5', primaryDark: '#4338CA', primaryDeep: '#312E81',
+  border: '#E0E7FF', borderLight: '#EEF2FF',
   receita: '#059669', receitaBg: '#D1FAE5',
   despesa: '#DC2626', despesaBg: '#FEE2E2',
   metaBg: '#EEF2FF', metaBorder: '#818CF8', metaText: '#3730A3',
-  text: '#0F172A', label: '#475569', textLight: '#94A3B8',
+  text: '#0F172A', label: '#64748B', textLight: '#94A3B8',
 };
 
 function fmt(v: number) { return 'R$ ' + Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
@@ -701,6 +701,8 @@ export default function App() {
 
           {/* Hero — saldo do mês atual */}
           <View style={s.heroCard}>
+            <View style={s.heroCircle1} pointerEvents="none"/>
+            <View style={s.heroCircle2} pointerEvents="none"/>
             <Text style={s.heroLabel}>Saldo de {MESES[hoje.getMonth()]}</Text>
             <Text style={[s.heroVal, { color: saldoAtual >= 0 ? '#FFFFFF' : '#FCA5A5' }]}>{fmtSaldo(saldoAtual)}</Text>
             <View style={s.heroRow}>
@@ -1036,7 +1038,7 @@ export default function App() {
 }
 
 const sl = StyleSheet.create({
-  input: { borderWidth: 0.5, borderColor: C.border, borderRadius: 10, padding: 12, fontSize: 14, marginBottom: 12, color: C.text, backgroundColor: C.bg },
+  input: { borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 12, fontSize: 14, marginBottom: 12, color: C.text, backgroundColor: C.bgCard },
 });
 
 const s = StyleSheet.create({
@@ -1052,7 +1054,7 @@ const s = StyleSheet.create({
   tabLabelAtivo: { color: C.primary, fontWeight: '600' },
 
   // FAB
-  fab: { position: 'absolute', right: 20, bottom: 72, width: 56, height: 56, borderRadius: 28, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', shadowColor: C.primaryDeep, shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  fab: { position: 'absolute', right: 20, bottom: 72, width: 58, height: 58, borderRadius: 29, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', shadowColor: C.primaryDeep, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 10 },
   fabText: { fontSize: 28, color: '#fff', lineHeight: 34, marginTop: -2 },
 
   // Toast
@@ -1061,13 +1063,15 @@ const s = StyleSheet.create({
 
   // Page headers
   pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingBottom: 12 },
-  greeting: { fontSize: 13, color: C.primaryDark },
+  greeting: { fontSize: 13, color: C.label },
   pageTitle: { fontSize: 22, fontWeight: '600', color: C.text },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 16, fontWeight: '600', color: '#fff' },
 
   // Hero card
-  heroCard: { backgroundColor: C.primaryDark, marginHorizontal: 16, borderRadius: 20, padding: 22, marginBottom: 16, shadowColor: C.primaryDark, shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
+  heroCard: { backgroundColor: C.primary, marginHorizontal: 16, borderRadius: 20, padding: 22, marginBottom: 16, shadowColor: C.primaryDeep, shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 10, overflow: 'hidden' },
+  heroCircle1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: '#7C3AED', opacity: 0.35, top: -60, right: -50 },
+  heroCircle2: { position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: '#6D28D9', opacity: 0.25, bottom: -30, left: -20 },
   heroLabel: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginBottom: 4, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase' },
   heroVal: { fontSize: 36, fontWeight: '700', color: '#fff', letterSpacing: -1, marginBottom: 18 },
   heroRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, padding: 12 },
@@ -1076,29 +1080,29 @@ const s = StyleSheet.create({
   heroDivider: { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.25)', marginHorizontal: 20 },
 
   // Forms
-  form: { backgroundColor: C.bgCard, margin: 16, borderRadius: 14, padding: 16, marginBottom: 8, borderWidth: 0.5, borderColor: C.borderLight },
+  form: { backgroundColor: C.bgCard, margin: 16, borderRadius: 16, padding: 16, marginBottom: 8, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   formTitulo: { fontSize: 15, fontWeight: '600', marginBottom: 12, color: C.text },
   input: { borderWidth: 0.5, borderColor: C.border, borderRadius: 10, padding: 10, fontSize: 14, marginBottom: 8, color: C.text, backgroundColor: C.bg },
   row: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   tipoBtn: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 10, alignItems: 'center', backgroundColor: C.bg },
-  tipoBtnText: { fontSize: 13, fontWeight: '500', color: C.primaryDark },
+  tipoBtnText: { fontSize: 13, fontWeight: '500', color: C.label },
   catScroll: { marginBottom: 12 },
   catBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99, borderWidth: 0.5, borderColor: C.border, marginRight: 6, backgroundColor: C.bg },
-  catBtnText: { fontSize: 12, color: C.primaryDark },
+  catBtnText: { fontSize: 12, color: C.label },
   btn: { borderRadius: 10, padding: 12, alignItems: 'center' },
   btnText: { fontSize: 14, fontWeight: '600' },
 
   // Filters
   filtros: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, marginBottom: 8 },
   filtroBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 0.5, borderColor: C.border, backgroundColor: C.bgCard },
-  filtroBtnText: { fontSize: 13, color: C.primaryDark },
+  filtroBtnText: { fontSize: 13, color: C.label },
 
   // Transaction list
-  txItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard, marginHorizontal: 16, marginBottom: 6, borderRadius: 12, padding: 12, gap: 10, borderWidth: 0.5, borderColor: C.borderLight },
+  txItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard, marginHorizontal: 16, marginBottom: 6, borderRadius: 12, padding: 12, gap: 10, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   txIcone: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   txInfo: { flex: 1 },
   txDesc: { fontSize: 14, fontWeight: '500', color: C.text },
-  txMeta: { fontSize: 12, color: C.primaryDark, marginTop: 2 },
+  txMeta: { fontSize: 12, color: C.label, marginTop: 2 },
   txValor: { fontSize: 14, fontWeight: '600' },
 
   // Empty state
@@ -1117,9 +1121,9 @@ const s = StyleSheet.create({
   ringRow: { flexDirection: 'row', justifyContent: 'center', gap: 24, paddingHorizontal: 16, marginBottom: 16 },
   ringItem: { alignItems: 'center' },
   ring: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', borderWidth: 2.5, marginBottom: 6 },
-  ringLabel: { fontSize: 11, color: C.primaryDark, marginBottom: 2 },
+  ringLabel: { fontSize: 11, color: C.label, marginBottom: 2 },
   ringVal: { fontSize: 13, fontWeight: '600' },
-  section: { backgroundColor: C.bgCard, marginHorizontal: 16, marginBottom: 12, borderRadius: 14, padding: 16, borderWidth: 0.5, borderColor: C.borderLight },
+  section: { backgroundColor: C.bgCard, marginHorizontal: 16, marginBottom: 12, borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   sectionTitulo: { fontSize: 15, fontWeight: '600', color: C.text, marginBottom: 14 },
   barComp: { flexDirection: 'row', height: 14, borderRadius: 7, overflow: 'hidden', marginBottom: 4 },
   barSeg: { height: 14 },
@@ -1138,7 +1142,7 @@ const s = StyleSheet.create({
   modalBox: { backgroundColor: C.bgCard, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, borderTopWidth: 0.5, borderTopColor: C.borderLight },
   modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.borderLight, alignSelf: 'center', marginBottom: 16 },
   modalTitulo: { fontSize: 18, fontWeight: '600', color: C.text, marginBottom: 4 },
-  modalSub: { fontSize: 13, color: C.primaryDark, marginBottom: 12 },
+  modalSub: { fontSize: 13, color: C.label, marginBottom: 12 },
   recItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: C.borderLight, borderRadius: 8 },
   checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
 
@@ -1149,6 +1153,6 @@ const s = StyleSheet.create({
 
   // OFX info box
   infoBox: { margin: 16, borderRadius: 12, padding: 16, marginBottom: 8, backgroundColor: C.bgAccent, borderWidth: 0.5, borderColor: C.border },
-  infoTitulo: { fontSize: 14, fontWeight: '600', color: C.primaryDeep },
-  infoTexto: { fontSize: 13, lineHeight: 22, color: C.primaryDark },
+  infoTitulo: { fontSize: 14, fontWeight: '600', color: C.text },
+  infoTexto: { fontSize: 13, lineHeight: 22, color: C.label },
 });
