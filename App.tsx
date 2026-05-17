@@ -21,8 +21,8 @@ type TransacaoOFX = { id: string; descricao: string; valor: number; tipo: Tipo; 
 
 const CATEGORIAS = ['Alimentação','Transporte','Moradia','Saúde','Lazer','Educação','Salário','Outros'];
 const CORES_CAT: Record<string,string> = {
-  Alimentação:'#059669', Transporte:'#0891B2', Moradia:'#D97706',
-  Saúde:'#DB2777', Lazer:'#7C3AED', Educação:'#16A34A', Salário:'#059669', Outros:'#64748B',
+  Alimentação:'#10B981', Transporte:'#0EA5E9', Moradia:'#F59E0B',
+  Saúde:'#EC4899', Lazer:'#8B5CF6', Educação:'#14B8A6', Salário:'#10B981', Outros:'#64748B',
 };
 const ICONES_CAT: Record<string,string> = {
   Alimentação:'🍽', Transporte:'🚗', Moradia:'🏠', Saúde:'💊',
@@ -31,12 +31,12 @@ const ICONES_CAT: Record<string,string> = {
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 const C = {
-  bg: '#FAFAF8', bgCard: '#FFFFFF', bgAccent: '#EEF2FF',
-  primary: '#4F46E5', primaryDark: '#4338CA', primaryDeep: '#312E81',
-  border: '#E0E7FF', borderLight: '#EEF2FF',
-  receita: '#059669', receitaBg: '#D1FAE5',
-  despesa: '#DC2626', despesaBg: '#FEE2E2',
-  metaBg: '#EEF2FF', metaBorder: '#818CF8', metaText: '#3730A3',
+  bg: '#F8FAFC', bgCard: '#FFFFFF', bgAccent: '#F1F5F9',
+  primary: '#1E293B', primaryDark: '#0F172A', primaryDeep: '#0F172A',
+  border: '#E2E8F0', borderLight: '#F1F5F9',
+  receita: '#10B981', receitaBg: '#ECFDF5',
+  despesa: '#F43F5E', despesaBg: '#FFF1F2',
+  metaBg: '#F1F5F9', metaBorder: '#94A3B8', metaText: '#1E293B',
   text: '#0F172A', label: '#64748B', textLight: '#94A3B8',
 };
 
@@ -1454,8 +1454,8 @@ const s = StyleSheet.create({
 
   // Hero card
   heroCard: { backgroundColor: C.primary, marginHorizontal: 16, borderRadius: 20, padding: 22, marginBottom: 12, shadowColor: C.primaryDeep, shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 10, overflow: 'hidden' },
-  heroCircle1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: '#7C3AED', opacity: 0.35, top: -60, right: -50 },
-  heroCircle2: { position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: '#6D28D9', opacity: 0.25, bottom: -30, left: -20 },
+  heroCircle1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: '#334155', opacity: 0.6, top: -60, right: -50 },
+  heroCircle2: { position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: '#475569', opacity: 0.4, bottom: -30, left: -20 },
   heroLabel: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginBottom: 4, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase' },
   heroVal: { fontSize: 36, fontWeight: '700', color: '#fff', letterSpacing: -1, marginBottom: 18 },
   heroRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, padding: 12 },
