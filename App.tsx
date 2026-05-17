@@ -154,12 +154,13 @@ function TelaLogin() {
   ];
 
   const LP = {
-    bg: '#F5F3FF',
-    accent: '#7C3AED',
-    accentLight: '#EDE9FE',
-    accentMid: '#DDD6FE',
-    text: '#0F172A',
-    label: '#64748B',
+    bg: C.bg,
+    accent: C.primary,
+    accentLight: C.bgAccent,
+    accentMid: C.border,
+    text: C.text,
+    label: C.label,
+    highlight: C.receita,
   };
 
   if (Platform.OS === 'web') {
@@ -181,14 +182,14 @@ function TelaLogin() {
             {/* Headline block */}
             <View style={{ flex: 1, justifyContent: 'center', paddingVertical: 32 }}>
               {/* Badge */}
-              <View style={{ alignSelf: 'flex-start', backgroundColor: LP.accentLight, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, marginBottom: 22 }}>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: LP.accent }}>Organize. Planeje. Conquiste.</Text>
+              <View style={{ alignSelf: 'flex-start', backgroundColor: C.receitaBg, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, marginBottom: 22 }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: C.receita }}>Organize. Planeje. Conquiste.</Text>
               </View>
 
               {/* Título */}
               <Text style={{ fontSize: 42, fontWeight: '800', color: LP.text, lineHeight: 52, letterSpacing: -1, marginBottom: 16 }}>
                 {'Sua vida financeira\nem '}
-                <Text style={{ color: LP.accent }}>um só lugar</Text>
+                <Text style={{ color: LP.highlight }}>um só lugar</Text>
               </Text>
 
               {/* Subtítulo */}
