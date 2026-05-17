@@ -1,6 +1,3 @@
 [build]
-  command = "npx expo export -p web"
+  command = ""
   publish = "dist"
-
-[build.environment]
-  NODE_VERSION = "20"
