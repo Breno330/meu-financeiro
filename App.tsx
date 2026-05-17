@@ -859,6 +859,14 @@ export default function App() {
   });
   const tendMax = Math.max(...tendencia.map(t => Math.max(t.rec, t.desp)), 1);
 
+  // Média diária de despesas
+  const diasNoMes = new Date(anoSel, mesSel + 1, 0).getDate();
+  const mediaDiaria = despesasMes > 0 ? despesasMes / diasNoMes : 0;
+  const totalRecDesp = receitasMes + despesasMes;
+  const pctRecTotal  = totalRecDesp > 0 ? Math.round(receitasMes / totalRecDesp * 100) : 0;
+  const pctDespTotal = totalRecDesp > 0 ? Math.round(despesasMes / totalRecDesp * 100) : 0;
+  const gastouPctAMais = receitasMes > 0 ? Math.round((despesasMes - receitasMes) / receitasMes * 100) : null;
+
   // Insights automáticos
   const insights: string[] = (() => {
     const r: string[] = [];
@@ -1180,137 +1188,222 @@ export default function App() {
       {aba === 'resumo' && (
         <ScrollView style={s.scroll}>
 
-          {/* Header */}
-          <View style={s.pageHeader}>
+          {/* ── Header ── */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 20, paddingBottom: 16 }}>
             <View>
-              <Text style={s.greeting}>Análise mensal</Text>
-              <Text style={s.pageTitle}>Resumo</Text>
+              <Text style={{ fontSize: 22, fontWeight: '700', color: C.text, letterSpacing: -0.5 }}>Resumo Financeiro</Text>
+              <Text style={{ fontSize: 13, color: C.label, marginTop: 3 }}>Acompanhe sua saúde financeira de forma simples e inteligente.</Text>
             </View>
             <View style={s.mesSeletorHeader}>
               <TouchableOpacity onPress={() => mesSel === 0 ? (setMesSel(11), setAnoSel(anoSel-1)) : setMesSel(mesSel-1)}>
                 <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>‹</Text>
               </TouchableOpacity>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: C.text }}>{MESES[mesSel].substring(0,3)} {anoSel}</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: C.text }}>📅 {MESES[mesSel].substring(0,3)} {anoSel}</Text>
               <TouchableOpacity onPress={() => mesSel === 11 ? (setMesSel(0), setAnoSel(anoSel+1)) : setMesSel(mesSel+1)}>
                 <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>›</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Hero do resumo */}
-          <View style={s.heroCard}>
-            <View style={s.heroCircle1} pointerEvents="none"/>
-            <View style={s.heroCircle2} pointerEvents="none"/>
-            <Text style={s.heroLabel}>SALDO DE {MESES[mesSel].toUpperCase()}</Text>
-            <Text style={[s.heroVal, { color: saldoMes >= 0 ? '#fff' : '#FCA5A5' }]}>{fmtSaldo(saldoMes)}</Text>
-            <View style={[s.heroBadge, { backgroundColor: saldoMes >= 0 ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)' }]}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: saldoMes >= 0 ? '#6EE7B7' : '#FCA5A5' }}>
-                {saldoMes >= 0 ? '✓ Superávit neste mês' : '↓ Déficit neste mês'}
+          {/* ── Linha 1: Hero + Receitas vs Despesas ── */}
+          <View style={{ flexDirection: 'row', gap: 12, marginHorizontal: 16, marginBottom: 12 }}>
+
+            {/* Hero — saldo */}
+            <View style={[s.heroCard, { flex: 1, marginHorizontal: 0, marginBottom: 0 }]}>
+              <View style={s.heroCircle1} pointerEvents="none"/>
+              <View style={s.heroCircle2} pointerEvents="none"/>
+              <Text style={s.heroLabel}>SALDO ATUAL</Text>
+              <Text style={[s.heroVal, { fontSize: 28, color: saldoMes >= 0 ? '#fff' : '#FCA5A5' }]}>{fmtSaldo(saldoMes)}</Text>
+              <View style={[s.heroBadge, { backgroundColor: saldoMes >= 0 ? 'rgba(16,185,129,0.25)' : 'rgba(244,63,94,0.3)', marginBottom: 12 }]}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: saldoMes >= 0 ? '#6EE7B7' : '#FCA5A5' }}>
+                  {saldoMes >= 0 ? '✓ Superávit neste mês' : '↓ Déficit neste mês'}
+                </Text>
+              </View>
+              {gastouPctAMais !== null && gastouPctAMais > 0 && (
+                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 18 }}>
+                  Você gastou <Text style={{ color: '#FCA5A5', fontWeight: '600' }}>{gastouPctAMais}%</Text> a mais do que recebeu.
+                </Text>
+              )}
+              {saldoMes >= 0 && receitasMes > 0 && (
+                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 18 }}>
+                  Economia de <Text style={{ color: '#6EE7B7', fontWeight: '600' }}>{Math.round(saldoMes/receitasMes*100)}%</Text> da receita.
+                </Text>
+              )}
+              {/* Mini barras decorativas */}
+              <View style={{ flexDirection: 'row', gap: 3, alignItems: 'flex-end', marginTop: 16, height: 28 }}>
+                {[35,55,42,70,48,80,60].map((h, i) => (
+                  <View key={i} style={{ flex: 1, height: Math.round(h*0.28), borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.15)' }}/>
+                ))}
+              </View>
+            </View>
+
+            {/* Receitas vs Despesas */}
+            <View style={[s.section, { flex: 1.4, marginHorizontal: 0, marginBottom: 0 }]}>
+              <Text style={s.sectionTitulo}>Receitas vs Despesas</Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                {/* Coluna esquerda: valores */}
+                <View style={{ flex: 1, gap: 16 }}>
+                  <View>
+                    <Text style={{ fontSize: 11, color: C.label, marginBottom: 4 }}>Receitas</Text>
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: C.receita }}>{fmt(receitasMes)}</Text>
+                    <Text style={{ fontSize: 11, color: C.label, marginTop: 2 }}>{pctRecTotal}% do total</Text>
+                    <View style={{ height: 5, backgroundColor: C.bgAccent, borderRadius: 3, marginTop: 6, overflow: 'hidden' }}>
+                      <View style={{ height: 5, backgroundColor: C.receita, borderRadius: 3, width: `${pctRecTotal}%` as any }}/>
+                    </View>
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 11, color: C.label, marginBottom: 4 }}>Despesas</Text>
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: C.despesa }}>{fmt(despesasMes)}</Text>
+                    <Text style={{ fontSize: 11, color: C.label, marginTop: 2 }}>{pctDespTotal}% do total</Text>
+                    <View style={{ height: 5, backgroundColor: C.bgAccent, borderRadius: 3, marginTop: 6, overflow: 'hidden' }}>
+                      <View style={{ height: 5, backgroundColor: C.despesa, borderRadius: 3, width: `${pctDespTotal}%` as any }}/>
+                    </View>
+                  </View>
+                </View>
+                {/* Donut */}
+                {(receitasMes > 0 || despesasMes > 0) && (
+                  <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                    <GraficoPizza dados={[['Receitas', receitasMes], ['Despesas', despesasMes]]} />
+                    <Text style={{ fontSize: 11, color: C.label, marginTop: -60 }}>{pctDespTotal}%</Text>
+                    <Text style={{ fontSize: 10, color: C.textLight, marginTop: 2, marginBottom: 60 }}>Despesas</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+          </View>
+
+          {/* ── Linha 2: 4 cards de stats ── */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+            {/* Receitas */}
+            <View style={[s.statCard, { width: 160 }]}>
+              <View style={[s.statIcone, { backgroundColor: C.receitaBg }]}><Text style={{ fontSize: 16 }}>📈</Text></View>
+              <Text style={s.statLabel}>Receitas</Text>
+              <Text style={[s.statVal, { color: C.receita }]}>{fmt(receitasMes)}</Text>
+              {pctRecSel !== null && (
+                <Text style={[s.statPct, { color: pctRecSel >= 0 ? C.receita : C.despesa }]}>
+                  {pctRecSel >= 0 ? '▲' : '▼'} {Math.abs(Math.round(pctRecSel))}% vs {MESES[mesSeldAnt].substring(0,3)}
+                </Text>
+              )}
+            </View>
+            {/* Despesas */}
+            <View style={[s.statCard, { width: 160 }]}>
+              <View style={[s.statIcone, { backgroundColor: C.despesaBg }]}><Text style={{ fontSize: 16 }}>📉</Text></View>
+              <Text style={s.statLabel}>Despesas</Text>
+              <Text style={[s.statVal, { color: C.despesa }]}>{fmt(despesasMes)}</Text>
+              {pctDespSel !== null && (
+                <Text style={[s.statPct, { color: pctDespSel > 0 ? C.despesa : C.receita }]}>
+                  {pctDespSel > 0 ? '▲' : '▼'} {Math.abs(Math.round(pctDespSel))}% vs {MESES[mesSeldAnt].substring(0,3)}
+                </Text>
+              )}
+            </View>
+            {/* Diferença */}
+            <View style={[s.statCard, { width: 160 }]}>
+              <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}><Text style={{ fontSize: 16 }}>💰</Text></View>
+              <Text style={s.statLabel}>Diferença</Text>
+              <Text style={[s.statVal, { color: saldoMes >= 0 ? C.receita : C.despesa }]}>{fmtSaldo(saldoMes)}</Text>
+              <Text style={[s.statPct, { color: saldoMes >= 0 ? C.receita : C.despesa }]}>
+                {saldoMes >= 0 ? 'Superávit' : `Déficit de ${gastouPctAMais ?? 0}%`}
               </Text>
             </View>
-            <View style={s.heroRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.heroSubLabel}>RECEITAS</Text>
-                <Text style={s.heroSubVal}>{fmt(receitasMes)}</Text>
-                {pctRecSel !== null && <Text style={{ fontSize: 11, color: pctRecSel >= 0 ? '#6EE7B7' : '#FCA5A5', marginTop: 2 }}>{pctRecSel >= 0 ? '▲' : '▼'} {Math.abs(Math.round(pctRecSel))}% vs mês ant.</Text>}
-              </View>
-              <View style={s.heroDivider}/>
-              <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <Text style={s.heroSubLabel}>DESPESAS</Text>
-                <Text style={s.heroSubVal}>{fmt(despesasMes)}</Text>
-                {pctDespSel !== null && <Text style={{ fontSize: 11, color: pctDespSel > 0 ? '#FCA5A5' : '#6EE7B7', marginTop: 2 }}>{pctDespSel > 0 ? '▲' : '▼'} {Math.abs(Math.round(pctDespSel))}% vs mês ant.</Text>}
-              </View>
+            {/* Média diária */}
+            <View style={[s.statCard, { width: 160 }]}>
+              <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}><Text style={{ fontSize: 16 }}>📅</Text></View>
+              <Text style={s.statLabel}>Média diária</Text>
+              <Text style={[s.statVal, { color: C.text }]}>{mediaDiaria > 0 ? fmt(mediaDiaria) : '—'}</Text>
+              <Text style={s.statPct}>Baseado nos {diasNoMes} dias</Text>
             </View>
-          </View>
+          </ScrollView>
 
-          {/* Receitas vs Despesas */}
-          {(receitasMes > 0 || despesasMes > 0) && (
-            <View style={s.section}>
-              <Text style={s.sectionTitulo}>Receitas vs Despesas</Text>
-              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
-                <View style={{ flex: 1, backgroundColor: C.receitaBg, borderRadius: 10, padding: 10 }}>
-                  <Text style={{ fontSize: 11, color: C.receita, fontWeight: '600', marginBottom: 2 }}>RECEITAS</Text>
-                  <Text style={{ fontSize: 16, fontWeight: '700', color: C.receita }}>{fmt(receitasMes)}</Text>
-                  <Text style={{ fontSize: 11, color: C.label, marginTop: 2 }}>{receitasMes > 0 ? Math.round(receitasMes/(receitasMes+despesasMes)*100) : 0}% do total</Text>
+          {/* ── Linha 3: Evolução + Categorias ── */}
+          <View style={{ flexDirection: 'row', gap: 12, marginHorizontal: 16, marginBottom: 12 }}>
+
+            {/* Evolução */}
+            <View style={[s.section, { flex: 1, marginHorizontal: 0, marginBottom: 0 }]}>
+              <Text style={s.sectionTitulo}>Evolução dos últimos 4 meses</Text>
+              {/* Eixo Y */}
+              <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+                <View style={{ width: 48 }}>
+                  {[tendMax, tendMax*0.75, tendMax*0.5, tendMax*0.25, 0].map((v, i) => (
+                    <Text key={i} style={{ fontSize: 9, color: C.textLight, textAlign: 'right', paddingRight: 4, height: 20, lineHeight: 20 }}>
+                      {v > 999 ? `R$${Math.round(v/1000)}k` : v > 0 ? `R$${Math.round(v)}` : 'R$0'}
+                    </Text>
+                  ))}
                 </View>
-                <View style={{ flex: 1, backgroundColor: C.despesaBg, borderRadius: 10, padding: 10 }}>
-                  <Text style={{ fontSize: 11, color: C.despesa, fontWeight: '600', marginBottom: 2 }}>DESPESAS</Text>
-                  <Text style={{ fontSize: 16, fontWeight: '700', color: C.despesa }}>{fmt(despesasMes)}</Text>
-                  <Text style={{ fontSize: 11, color: C.label, marginTop: 2 }}>{despesasMes > 0 ? Math.round(despesasMes/(receitasMes+despesasMes)*100) : 0}% do total</Text>
+                {/* Barras */}
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: 100 }}>
+                  {tendencia.map((t, i) => (
+                    <View key={i} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: 100 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 90 }}>
+                        <View style={{ width: 10, height: Math.max((t.rec/tendMax)*90, t.rec>0?4:0), backgroundColor: C.receita, borderRadius: 3 }}/>
+                        <View style={{ width: 10, height: Math.max((t.desp/tendMax)*90, t.desp>0?4:0), backgroundColor: C.despesa, borderRadius: 3 }}/>
+                      </View>
+                      <Text style={{ fontSize: 10, color: C.textLight, marginTop: 6 }}>{t.label}</Text>
+                    </View>
+                  ))}
                 </View>
               </View>
-              <View style={[s.barComp, { height: 20, borderRadius: 10 }]}>
-                {receitasMes > 0 && <View style={[s.barSeg, { flex: receitasMes, backgroundColor: C.receita }]}/>}
-                {despesasMes > 0 && <View style={[s.barSeg, { flex: despesasMes, backgroundColor: C.despesa }]}/>}
+              <View style={{ flexDirection: 'row', gap: 16, marginTop: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: C.receita }}/>
+                  <Text style={{ fontSize: 12, color: C.label }}>Receitas</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: C.despesa }}/>
+                  <Text style={{ fontSize: 12, color: C.label }}>Despesas</Text>
+                </View>
               </View>
             </View>
-          )}
 
-          {/* Tendência histórica */}
-          <View style={s.section}>
-            <Text style={s.sectionTitulo}>Evolução — últimos 4 meses</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: 80, marginBottom: 8 }}>
-              {tendencia.map((t, i) => (
-                <View key={i} style={{ flex: 1, alignItems: 'center' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 60 }}>
-                    <View style={{ width: 10, height: Math.max((t.rec / tendMax) * 60, t.rec > 0 ? 4 : 0), backgroundColor: C.receita, borderRadius: 3 }}/>
-                    <View style={{ width: 10, height: Math.max((t.desp / tendMax) * 60, t.desp > 0 ? 4 : 0), backgroundColor: C.despesa, borderRadius: 3 }}/>
-                  </View>
-                  <Text style={{ fontSize: 10, color: C.textLight, marginTop: 4 }}>{t.label}</Text>
-                </View>
-              ))}
-            </View>
-            <View style={{ flexDirection: 'row', gap: 16 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}><View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: C.receita }}/><Text style={{ fontSize: 12, color: C.label }}>Receitas</Text></View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}><View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: C.despesa }}/><Text style={{ fontSize: 12, color: C.label }}>Despesas</Text></View>
-            </View>
-          </View>
-
-          {/* Despesas por categoria */}
-          {cats.length > 0 ? (
-            <View style={s.section}>
+            {/* Categorias */}
+            <View style={[s.section, { flex: 1, marginHorizontal: 0, marginBottom: 0 }]}>
               <Text style={s.sectionTitulo}>Despesas por categoria</Text>
-              <GraficoPizza dados={cats} />
-              <View style={{ marginTop: 8 }}>
-                {cats.map(([c, v]) => {
-                  const pct = despesasMes > 0 ? Math.round(v / despesasMes * 100) : 0;
-                  const cor = CORES_CAT[c] || C.primary;
+              {cats.length > 0 ? (
+                <>
+                  <View style={{ alignItems: 'center', marginBottom: 8 }}>
+                    <GraficoPizza dados={cats}/>
+                    <Text style={{ fontSize: 12, color: C.label, marginTop: -50, fontWeight: '600' }}>{fmt(despesasMes)}</Text>
+                    <Text style={{ fontSize: 10, color: C.textLight, marginBottom: 50 }}>Total</Text>
+                  </View>
+                  {cats.map(([c, v]) => {
+                    const pct = despesasMes > 0 ? Math.round(v/despesasMes*100) : 0;
+                    const cor = CORES_CAT[c] || C.primary;
+                    return (
+                      <View key={c} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+                        <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: cor }}/>
+                        <Text style={{ flex: 1, fontSize: 12, color: C.label }}>{c}</Text>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: C.text, width: 36, textAlign: 'right' }}>{pct}%</Text>
+                      </View>
+                    );
+                  })}
+                </>
+              ) : (
+                <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+                  <Text style={{ fontSize: 32, marginBottom: 8 }}>📊</Text>
+                  <Text style={{ fontSize: 13, color: C.textLight }}>Sem despesas em {MESES[mesSel]}</Text>
+                </View>
+              )}
+            </View>
+
+          </View>
+
+          {/* ── Linha 4: Insights ── */}
+          {insights.length > 0 && (
+            <View style={{ marginHorizontal: 16, marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: C.text }}>💡 Insights para você</Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                {insights.map((insight, i) => {
+                  const isNeg = insight.includes('⚠️') || insight.includes('📈');
                   return (
-                    <View key={c} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
-                      <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: cor + '20', alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={{ fontSize: 13 }}>{ICONES_CAT[c]}</Text>
-                      </View>
-                      <Text style={{ fontSize: 13, color: C.label, width: 80 }}>{c}</Text>
-                      <View style={{ flex: 1, height: 8, backgroundColor: C.bgAccent, borderRadius: 4, overflow: 'hidden' }}>
-                        <View style={{ height: 8, borderRadius: 4, width: `${pct}%` as any, backgroundColor: cor }}/>
-                      </View>
-                      <Text style={{ fontSize: 11, color: C.label, width: 30, textAlign: 'right' }}>{pct}%</Text>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: C.text, width: 78, textAlign: 'right' }}>{fmt(v)}</Text>
+                    <View key={i} style={{ flex: 1, backgroundColor: C.bgCard, borderRadius: 14, padding: 14, borderLeftWidth: 3, borderLeftColor: isNeg ? C.despesa : C.receita, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+                      <Text style={{ fontSize: 20, marginBottom: 8 }}>{insight.substring(0, 2)}</Text>
+                      <Text style={{ fontSize: 12, color: C.text, lineHeight: 18, fontWeight: '500' }}>{insight.substring(2).trim()}</Text>
                     </View>
                   );
                 })}
               </View>
-            </View>
-          ) : (
-            <View style={s.vazioContainer}>
-              <Text style={s.vazioEmoji}>📊</Text>
-              <Text style={s.vazioTitulo}>Sem despesas</Text>
-              <Text style={s.vazioSub}>Nenhuma despesa registrada em {mesAno(mesSel, anoSel)}.</Text>
-            </View>
-          )}
-
-          {/* Insights automáticos */}
-          {insights.length > 0 && (
-            <View style={s.section}>
-              <Text style={s.sectionTitulo}>💡 Insights</Text>
-              {insights.map((insight, i) => (
-                <View key={i} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: i < insights.length - 1 ? 0.5 : 0, borderBottomColor: C.borderLight }}>
-                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.bgAccent, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontSize: 16 }}>{insight.substring(0, 2)}</Text>
-                  </View>
-                  <Text style={{ flex: 1, fontSize: 13, color: C.label, lineHeight: 20, paddingTop: 8 }}>{insight.substring(2).trim()}</Text>
-                </View>
-              ))}
             </View>
           )}
 
