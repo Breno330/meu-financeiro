@@ -153,59 +153,115 @@ function TelaLogin() {
     { icon: '🎯', text: 'Metas e alertas de gastos' },
   ];
 
+  const LP = {
+    bg: '#F5F3FF',
+    accent: '#7C3AED',
+    accentLight: '#EDE9FE',
+    accentMid: '#DDD6FE',
+    text: '#0F172A',
+    label: '#64748B',
+  };
+
   if (Platform.OS === 'web') {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: C.primaryDark }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: LP.bg }}>
         <View style={{ flex: 1, flexDirection: 'row' }}>
 
-          {/* Painel esquerdo — branding */}
-          <View style={{ flex: 1, backgroundColor: C.primaryDark, padding: 64, justifyContent: 'center' }}>
-            {/* Logo */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 56 }}>
-              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 22 }}>💰</Text>
+          {/* ── Painel esquerdo — branding ── */}
+          <View style={{ flex: 1.1, backgroundColor: LP.bg, paddingHorizontal: 56, paddingVertical: 48, justifyContent: 'space-between' }}>
+
+            {/* Logo topo */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: LP.accent, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 18 }}>💰</Text>
               </View>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff', letterSpacing: -0.3 }}>Meu Financeiro</Text>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: LP.text }}>Meu Financeiro</Text>
             </View>
 
-            {/* Headline */}
-            <Text style={{ fontSize: 40, fontWeight: '700', color: '#fff', lineHeight: 50, letterSpacing: -1, marginBottom: 16 }}>
-              {'Controle seu\ndinheiro com\nclareza.'}
-            </Text>
-            <Text style={{ fontSize: 15, color: 'rgba(255,255,255,0.45)', lineHeight: 26, marginBottom: 48 }}>
-              {'Acompanhe receitas, despesas\ne metas em um só lugar.'}
-            </Text>
-
-            {/* Features */}
-            {features.map((f, i) => (
-              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 18 }}>
-                <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontSize: 17 }}>{f.icon}</Text>
-                </View>
-                <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 20 }}>{f.text}</Text>
+            {/* Headline block */}
+            <View style={{ flex: 1, justifyContent: 'center', paddingVertical: 32 }}>
+              {/* Badge */}
+              <View style={{ alignSelf: 'flex-start', backgroundColor: LP.accentLight, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, marginBottom: 22 }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: LP.accent }}>Organize. Planeje. Conquiste.</Text>
               </View>
-            ))}
 
-            {/* Bottom divider line */}
-            <View style={{ position: 'absolute', right: 0, top: 40, bottom: 40, width: 1, backgroundColor: 'rgba(255,255,255,0.06)' }}/>
+              {/* Título */}
+              <Text style={{ fontSize: 42, fontWeight: '800', color: LP.text, lineHeight: 52, letterSpacing: -1, marginBottom: 16 }}>
+                {'Sua vida financeira\nem '}
+                <Text style={{ color: LP.accent }}>um só lugar</Text>
+              </Text>
+
+              {/* Subtítulo */}
+              <Text style={{ fontSize: 15, color: LP.label, lineHeight: 26, marginBottom: 40, maxWidth: 380 }}>
+                Acompanhe receitas, despesas, metas e tenha clareza total sobre seu dinheiro.
+              </Text>
+
+              {/* Features */}
+              {[
+                { icon: '📈', title: 'Visão completa', desc: 'Tenha controle de todas as suas finanças' },
+                { icon: '🎯', title: 'Metas inteligentes', desc: 'Defina objetivos e acompanhe seu progresso' },
+                { icon: '🔒', title: 'Seguro e privado', desc: 'Seus dados protegidos com segurança' },
+              ].map((f, i) => (
+                <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 18 }}>
+                  <View style={{ width: 44, height: 44, borderRadius: 13, backgroundColor: LP.accentLight, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 19 }}>{f.icon}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: LP.text, marginBottom: 2 }}>{f.title}</Text>
+                    <Text style={{ fontSize: 12, color: LP.label }}>{f.desc}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            {/* Mini mockup do app */}
+            <View style={{ alignItems: 'flex-start' }}>
+              <View style={{ width: 220, backgroundColor: '#fff', borderRadius: 18, padding: 16, shadowColor: LP.accent, shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 10, borderWidth: 1, borderColor: LP.accentMid }}>
+                <Text style={{ fontSize: 10, color: LP.label, marginBottom: 3 }}>Saldo atual</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                  <Text style={{ fontSize: 20, fontWeight: '700', color: LP.text }}>R$ 2.560,75</Text>
+                  <View style={{ backgroundColor: '#ECFDF5', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 }}>
+                    <Text style={{ fontSize: 9, color: '#10B981', fontWeight: '700' }}>+12,5%</Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 10, color: LP.label, marginBottom: 10 }}>Resumo do mês</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <View>
+                    <Text style={{ fontSize: 9, color: '#10B981', fontWeight: '600', marginBottom: 2 }}>Receitas</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: LP.text }}>R$ 4.350,00</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 9, color: '#F43F5E', fontWeight: '600', marginBottom: 2 }}>Despesas</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: LP.text }}>R$ 1.789,25</Text>
+                  </View>
+                </View>
+                {/* Mini barras */}
+                <View style={{ flexDirection: 'row', gap: 4, alignItems: 'flex-end', height: 32 }}>
+                  {[40, 65, 45, 80, 55, 90, 50].map((h, i) => (
+                    <View key={i} style={{ flex: 1, justifyContent: 'flex-end' }}>
+                      <View style={{ height: Math.round(h * 0.32), backgroundColor: i === 5 ? LP.accent : LP.accentLight, borderRadius: 3 }}/>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+
           </View>
 
-          {/* Painel direito — formulário */}
-          <View style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', padding: 64 }}>
+          {/* ── Painel direito — formulário ── */}
+          <View style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', padding: 64, borderLeftWidth: 1, borderLeftColor: LP.accentMid }}>
             <View style={{ width: '100%', maxWidth: 380 }}>
 
-              {/* Título do form */}
-              <Text style={{ fontSize: 28, fontWeight: '700', color: C.text, letterSpacing: -0.5, marginBottom: 6 }}>
+              <Text style={{ fontSize: 28, fontWeight: '700', color: LP.text, letterSpacing: -0.5, marginBottom: 6 }}>
                 {modo === 'login' ? 'Bem-vindo de volta' : 'Criar conta'}
               </Text>
-              <Text style={{ fontSize: 14, color: C.label, marginBottom: 36 }}>
+              <Text style={{ fontSize: 14, color: LP.label, marginBottom: 36 }}>
                 {modo === 'login' ? 'Entre na sua conta para continuar' : 'Crie sua conta gratuitamente'}
               </Text>
 
-              {/* E-mail */}
-              <Text style={{ fontSize: 13, fontWeight: '600', color: C.text, marginBottom: 7 }}>E-mail</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: LP.text, marginBottom: 7 }}>E-mail</Text>
               <TextInput
-                style={inputStyle}
+                style={[inputStyle, { borderColor: LP.accentMid }]}
                 placeholder="seu@email.com"
                 placeholderTextColor={C.textLight}
                 value={email}
@@ -214,10 +270,9 @@ function TelaLogin() {
                 autoCapitalize="none"
               />
 
-              {/* Senha */}
-              <Text style={{ fontSize: 13, fontWeight: '600', color: C.text, marginBottom: 7 }}>Senha</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: LP.text, marginBottom: 7 }}>Senha</Text>
               <TextInput
-                style={[inputStyle, { marginBottom: 28 }]}
+                style={[inputStyle, { borderColor: LP.accentMid, marginBottom: 28 }]}
                 placeholder="••••••••"
                 placeholderTextColor={C.textLight}
                 value={senha}
@@ -225,9 +280,8 @@ function TelaLogin() {
                 secureTextEntry
               />
 
-              {/* Botão */}
               <TouchableOpacity
-                style={{ backgroundColor: C.primary, borderRadius: 10, padding: 15, alignItems: 'center', opacity: carregando ? 0.6 : 1, marginBottom: 20 }}
+                style={{ backgroundColor: LP.accent, borderRadius: 10, padding: 15, alignItems: 'center', opacity: carregando ? 0.6 : 1, marginBottom: 20 }}
                 onPress={modo === 'login' ? entrar : cadastrar}
                 disabled={carregando}
               >
@@ -237,17 +291,17 @@ function TelaLogin() {
                 }
               </TouchableOpacity>
 
-              {/* Toggle */}
               <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 5 }}>
-                <Text style={{ fontSize: 14, color: C.label }}>
+                <Text style={{ fontSize: 14, color: LP.label }}>
                   {modo === 'login' ? 'Não tem conta?' : 'Já tem conta?'}
                 </Text>
                 <TouchableOpacity onPress={() => setModo(modo === 'login' ? 'cadastro' : 'login')}>
-                  <Text style={{ fontSize: 14, color: C.primary, fontWeight: '700' }}>
+                  <Text style={{ fontSize: 14, color: LP.accent, fontWeight: '700' }}>
                     {modo === 'login' ? 'Cadastre-se' : 'Entrar'}
                   </Text>
                 </TouchableOpacity>
               </View>
+
             </View>
           </View>
 
