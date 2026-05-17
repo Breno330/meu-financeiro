@@ -141,55 +141,184 @@ function TelaLogin() {
     setCarregando(false);
   }
 
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'center', padding: 24 }}>
-        <View style={{ alignItems: 'center', marginBottom: 40 }}>
-          <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-            <Text style={{ fontSize: 32 }}>💰</Text>
+  const inputStyle = {
+    borderWidth: 1.5, borderColor: C.border, borderRadius: 10,
+    padding: 13, fontSize: 14 as const, marginBottom: 16,
+    color: C.text, backgroundColor: C.bg,
+  };
+
+  const features = [
+    { icon: '📊', text: 'Resumo visual do mês' },
+    { icon: '🔄', text: 'Lançamentos recorrentes automáticos' },
+    { icon: '🎯', text: 'Metas e alertas de gastos' },
+  ];
+
+  if (Platform.OS === 'web') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.primaryDark }}>
+        <View style={{ flex: 1, flexDirection: 'row' }}>
+
+          {/* Painel esquerdo — branding */}
+          <View style={{ flex: 1, backgroundColor: C.primaryDark, padding: 64, justifyContent: 'center' }}>
+            {/* Logo */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 56 }}>
+              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 22 }}>💰</Text>
+              </View>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff', letterSpacing: -0.3 }}>Meu Financeiro</Text>
+            </View>
+
+            {/* Headline */}
+            <Text style={{ fontSize: 40, fontWeight: '700', color: '#fff', lineHeight: 50, letterSpacing: -1, marginBottom: 16 }}>
+              {'Controle seu\ndinheiro com\nclareza.'}
+            </Text>
+            <Text style={{ fontSize: 15, color: 'rgba(255,255,255,0.45)', lineHeight: 26, marginBottom: 48 }}>
+              {'Acompanhe receitas, despesas\ne metas em um só lugar.'}
+            </Text>
+
+            {/* Features */}
+            {features.map((f, i) => (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 18 }}>
+                <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 17 }}>{f.icon}</Text>
+                </View>
+                <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 20 }}>{f.text}</Text>
+              </View>
+            ))}
+
+            {/* Bottom divider line */}
+            <View style={{ position: 'absolute', right: 0, top: 40, bottom: 40, width: 1, backgroundColor: 'rgba(255,255,255,0.06)' }}/>
           </View>
-          <Text style={{ fontSize: 26, fontWeight: '700', color: C.text }}>Meu Financeiro</Text>
-          <Text style={{ fontSize: 14, color: C.textLight, marginTop: 4 }}>Controle suas finanças com facilidade</Text>
+
+          {/* Painel direito — formulário */}
+          <View style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', padding: 64 }}>
+            <View style={{ width: '100%', maxWidth: 380 }}>
+
+              {/* Título do form */}
+              <Text style={{ fontSize: 28, fontWeight: '700', color: C.text, letterSpacing: -0.5, marginBottom: 6 }}>
+                {modo === 'login' ? 'Bem-vindo de volta' : 'Criar conta'}
+              </Text>
+              <Text style={{ fontSize: 14, color: C.label, marginBottom: 36 }}>
+                {modo === 'login' ? 'Entre na sua conta para continuar' : 'Crie sua conta gratuitamente'}
+              </Text>
+
+              {/* E-mail */}
+              <Text style={{ fontSize: 13, fontWeight: '600', color: C.text, marginBottom: 7 }}>E-mail</Text>
+              <TextInput
+                style={inputStyle}
+                placeholder="seu@email.com"
+                placeholderTextColor={C.textLight}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+
+              {/* Senha */}
+              <Text style={{ fontSize: 13, fontWeight: '600', color: C.text, marginBottom: 7 }}>Senha</Text>
+              <TextInput
+                style={[inputStyle, { marginBottom: 28 }]}
+                placeholder="••••••••"
+                placeholderTextColor={C.textLight}
+                value={senha}
+                onChangeText={setSenha}
+                secureTextEntry
+              />
+
+              {/* Botão */}
+              <TouchableOpacity
+                style={{ backgroundColor: C.primary, borderRadius: 10, padding: 15, alignItems: 'center', opacity: carregando ? 0.6 : 1, marginBottom: 20 }}
+                onPress={modo === 'login' ? entrar : cadastrar}
+                disabled={carregando}
+              >
+                {carregando
+                  ? <ActivityIndicator color="#fff"/>
+                  : <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>{modo === 'login' ? 'Entrar' : 'Criar conta'}</Text>
+                }
+              </TouchableOpacity>
+
+              {/* Toggle */}
+              <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 5 }}>
+                <Text style={{ fontSize: 14, color: C.label }}>
+                  {modo === 'login' ? 'Não tem conta?' : 'Já tem conta?'}
+                </Text>
+                <TouchableOpacity onPress={() => setModo(modo === 'login' ? 'cadastro' : 'login')}>
+                  <Text style={{ fontSize: 14, color: C.primary, fontWeight: '700' }}>
+                    {modo === 'login' ? 'Cadastre-se' : 'Entrar'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Layout mobile
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.primaryDark }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+
+        {/* Hero topo */}
+        <View style={{ paddingTop: 52, paddingBottom: 44, paddingHorizontal: 28, alignItems: 'center' }}>
+          <View style={{ width: 64, height: 64, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <Text style={{ fontSize: 30 }}>💰</Text>
+          </View>
+          <Text style={{ fontSize: 24, fontWeight: '700', color: '#fff', letterSpacing: -0.5, marginBottom: 6 }}>Meu Financeiro</Text>
+          <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', textAlign: 'center' }}>Controle suas finanças com facilidade</Text>
         </View>
 
-        <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, borderWidth: 0.5, borderColor: C.borderLight }}>
-          <Text style={{ fontSize: 18, fontWeight: '600', color: C.text, marginBottom: 16 }}>
+        {/* Card do formulário sobreposto */}
+        <View style={{ flex: 1, backgroundColor: C.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 28 }}>
+          <Text style={{ fontSize: 22, fontWeight: '700', color: C.text, letterSpacing: -0.4, marginBottom: 4 }}>
             {modo === 'login' ? 'Entrar na conta' : 'Criar conta'}
           </Text>
+          <Text style={{ fontSize: 13, color: C.label, marginBottom: 24 }}>
+            {modo === 'login' ? 'Bem-vindo de volta 👋' : 'Preencha os dados abaixo'}
+          </Text>
+
+          <Text style={{ fontSize: 13, fontWeight: '600', color: C.text, marginBottom: 7 }}>E-mail</Text>
           <TextInput
-            style={[sl.input]}
-            placeholder="E-mail"
+            style={inputStyle}
+            placeholder="seu@email.com"
             placeholderTextColor={C.textLight}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
           />
+
+          <Text style={{ fontSize: 13, fontWeight: '600', color: C.text, marginBottom: 7 }}>Senha</Text>
           <TextInput
-            style={[sl.input]}
-            placeholder="Senha"
+            style={[inputStyle, { marginBottom: 28 }]}
+            placeholder="••••••••"
             placeholderTextColor={C.textLight}
             value={senha}
             onChangeText={setSenha}
             secureTextEntry
           />
+
           <TouchableOpacity
-            style={{ backgroundColor: C.primary, borderRadius: 10, padding: 14, alignItems: 'center', opacity: carregando ? 0.6 : 1, marginTop: 4 }}
+            style={{ backgroundColor: C.primary, borderRadius: 12, padding: 15, alignItems: 'center', opacity: carregando ? 0.6 : 1 }}
             onPress={modo === 'login' ? entrar : cadastrar}
             disabled={carregando}
           >
             {carregando
-              ? <ActivityIndicator color="#fff" />
+              ? <ActivityIndicator color="#fff"/>
               : <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>{modo === 'login' ? 'Entrar' : 'Criar conta'}</Text>
             }
           </TouchableOpacity>
+
+          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 20 }}>
+            <Text style={{ fontSize: 14, color: C.label }}>{modo === 'login' ? 'Não tem conta?' : 'Já tem conta?'}</Text>
+            <TouchableOpacity onPress={() => setModo(modo === 'login' ? 'cadastro' : 'login')}>
+              <Text style={{ fontSize: 14, color: C.primary, fontWeight: '700' }}>{modo === 'login' ? 'Cadastre-se' : 'Entrar'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <TouchableOpacity style={{ alignItems: 'center', marginTop: 20 }} onPress={() => setModo(modo === 'login' ? 'cadastro' : 'login')}>
-          <Text style={{ color: C.primaryDark, fontSize: 14 }}>
-            {modo === 'login' ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entrar'}
-          </Text>
-        </TouchableOpacity>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
