@@ -225,6 +225,7 @@ export default function App() {
   const [salvandoRec, setSalvandoRec] = useState(false);
   const [recEhParcelado, setRecEhParcelado] = useState(false);
   const [recParcelas, setRecParcelas] = useState('');
+  const [busca, setBusca] = useState('');
   const [txOFX, setTxOFX] = useState<TransacaoOFX[]>([]);
   const [arquivoNome, setArquivoNome] = useState('');
   const [salvandoOFX, setSalvandoOFX] = useState(false);
@@ -586,6 +587,8 @@ export default function App() {
   }
 
   function txDoMes(m: number, a: number) { return transacoes.filter(t => { const p = t.data?.split('/'); return p && parseInt(p[1])-1 === m && parseInt(p[2]) === a; }); }
+
+  // Resumo tab
   const txMes = txDoMes(mesSel, anoSel);
   const receitasMes = txMes.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
   const despesasMes = txMes.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
@@ -594,18 +597,62 @@ export default function App() {
   txMes.filter(t => t.tipo === 'despesa').forEach(t => { catMap[t.categoria] = (catMap[t.categoria]||0)+Number(t.valor); });
   const cats = Object.entries(catMap).sort((a,b) => b[1]-a[1]);
   const maxCat = cats.length > 0 ? cats[0][1] : 1;
+
+  // Mês atual (hero)
   const txAtual = txDoMes(hoje.getMonth(), hoje.getFullYear());
   const recAtual = txAtual.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
   const despAtual = txAtual.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
   const saldoAtual = recAtual - despAtual;
   const metasMes = metas.filter(m => m.mes === hoje.getMonth() && m.ano === hoje.getFullYear());
-  const totalRec = transacoes.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
-  const totalDesp = transacoes.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
+
+  // Mês do filtro (lancamentos tab)
+  const txFiltroMes = txDoMes(filtroMes, filtroAno);
+  const recFiltroMes = txFiltroMes.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
+  const despFiltroMes = txFiltroMes.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
+  const saldoFiltroMes = recFiltroMes - despFiltroMes;
+
+  // Mês anterior para comparação %
+  const filtroMesAntIdx = filtroMes === 0 ? 11 : filtroMes - 1;
+  const filtroAnoAntIdx = filtroMes === 0 ? filtroAno - 1 : filtroAno;
+  const txMesAnt = txDoMes(filtroMesAntIdx, filtroAnoAntIdx);
+  const recMesAnt = txMesAnt.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
+  const despMesAnt = txMesAnt.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
+  const pctRec = recMesAnt > 0 ? ((recFiltroMes - recMesAnt) / recMesAnt * 100) : null;
+  const pctDesp = despMesAnt > 0 ? ((despFiltroMes - despMesAnt) / despMesAnt * 100) : null;
+
+  // Maior categoria do filtro
+  const catMapFiltro: Record<string,number> = {};
+  txFiltroMes.filter(t => t.tipo === 'despesa').forEach(t => { catMapFiltro[t.categoria] = (catMapFiltro[t.categoria]||0)+Number(t.valor); });
+  const catsFiltro = Object.entries(catMapFiltro).sort((a,b) => b[1]-a[1]);
+  const maiorCat = catsFiltro[0];
+
+  // Transações visíveis com busca
   const visiveis = transacoes.filter(t => {
     const p = t.data?.split('/');
     const noMes = p && parseInt(p[1])-1 === filtroMes && parseInt(p[2]) === filtroAno;
-    return noMes && (filtro === 'todas' || t.tipo === filtro);
+    const matchTipo = filtro === 'todas' || t.tipo === filtro;
+    const matchBusca = !busca || t.descricao.toLowerCase().includes(busca.toLowerCase()) || t.categoria.toLowerCase().includes(busca.toLowerCase());
+    return noMes && matchTipo && matchBusca;
   });
+
+  // Agrupamento por data
+  function formatarDataGrupo(dataStr: string): string {
+    const hojeStr = hoje.toLocaleDateString('pt-BR');
+    const ontem = new Date(hoje); ontem.setDate(hoje.getDate() - 1);
+    const ontemStr = ontem.toLocaleDateString('pt-BR');
+    if (dataStr === hojeStr) return 'Hoje';
+    if (dataStr === ontemStr) return 'Ontem';
+    const p = dataStr.split('/');
+    if (p.length === 3) return `${parseInt(p[0])} de ${MESES[parseInt(p[1])-1]}`;
+    return dataStr;
+  }
+  const txAgrupadas = visiveis.reduce((acc, t) => { if (!acc[t.data]) acc[t.data] = []; acc[t.data].push(t); return acc; }, {} as Record<string, Transacao[]>);
+  const datasOrdenadas = Object.keys(txAgrupadas).sort((a, b) => {
+    const [da,ma,ya] = a.split('/').map(Number);
+    const [db,mb,yb] = b.split('/').map(Number);
+    return new Date(yb,mb-1,db).getTime() - new Date(ya,ma-1,da).getTime();
+  });
+
   const selOFX = txOFX.filter(t => t.selecionada).length;
 
   function getProgMeta(m: Meta) {
@@ -621,6 +668,13 @@ export default function App() {
   );
 
   if (!session) return <TelaLogin />;
+
+  const TABS = [
+    { key: 'lancamentos' as Aba, icon: '🏠', label: 'Início' },
+    { key: 'resumo' as Aba,      icon: '📊', label: 'Resumo' },
+    { key: 'metas' as Aba,       icon: '🎯', label: alertas.length > 0 ? 'Metas 🔴' : 'Metas' },
+    { key: 'importar' as Aba,    icon: '📥', label: 'Extrato' },
+  ];
 
   return (
     <SafeAreaView style={s.safe}>
@@ -721,82 +775,180 @@ export default function App() {
         </TouchableOpacity>
       </Modal>
 
-      {/* ── Alertas ── */}
-      {alertas.length > 0 && (
-        <TouchableOpacity style={s.alertaBanner} onPress={() => setShowAlertas(!showAlertas)}>
-          <Text style={s.alertaBannerText}>🚨 {alertas.length} alerta{alertas.length > 1 ? 's' : ''} — toque para ver</Text>
-        </TouchableOpacity>
-      )}
-      {showAlertas && alertas.map((a, i) => <Text key={i} style={s.alertaItem}>{a}</Text>)}
+      {/* ── Layout principal com sidebar web ── */}
+      <View style={{ flex: 1, flexDirection: 'row' }}>
+
+        {/* Sidebar — só web */}
+        {Platform.OS === 'web' && (
+          <View style={s.sidebar}>
+            <View style={s.sidebarLogo}>
+              <Text style={{ fontSize: 22 }}>💰</Text>
+              <Text style={s.sidebarLogoText}>Meu Financeiro</Text>
+            </View>
+            {TABS.map(item => (
+              <TouchableOpacity key={item.key} style={[s.sidebarItem, aba === item.key && s.sidebarItemAtivo]} onPress={() => setAba(item.key)}>
+                <Text style={s.sidebarIcon}>{item.icon}</Text>
+                <Text style={[s.sidebarLabel, aba === item.key && s.sidebarLabelAtivo]}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+            <View style={{ flex: 1 }}/>
+            <TouchableOpacity style={s.sidebarItem} onPress={() => supabase.auth.signOut()}>
+              <Text style={s.sidebarIcon}>↩</Text>
+              <Text style={s.sidebarLabel}>Sair</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Conteúdo principal */}
+        <View style={{ flex: 1 }}>
+
+          {/* ── Alertas ── */}
+          {alertas.length > 0 && (
+            <TouchableOpacity style={s.alertaBanner} onPress={() => setShowAlertas(!showAlertas)}>
+              <Text style={s.alertaBannerText}>🚨 {alertas.length} alerta{alertas.length > 1 ? 's' : ''} — toque para ver</Text>
+            </TouchableOpacity>
+          )}
+          {showAlertas && alertas.map((a, i) => <Text key={i} style={s.alertaItem}>{a}</Text>)}
 
       {/* ── Aba: Início ── */}
       {aba === 'lancamentos' && (
         <ScrollView style={s.scroll} keyboardShouldPersistTaps="handled">
+          {/* Header */}
           <View style={s.pageHeader}>
-            <View><Text style={s.greeting}>{saudacao()}</Text><Text style={s.pageTitle}>Minhas Finanças</Text></View>
-            <TouchableOpacity style={s.avatar} onPress={() => supabase.auth.signOut()}>
-              <Text style={s.avatarText}>↩</Text>
-            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={s.greeting}>{saudacao()} 👋</Text>
+              <Text style={s.pageTitle}>Minhas Finanças</Text>
+              <Text style={{ fontSize: 12, color: C.textLight, marginTop: 2 }}>Aqui está o resumo das suas finanças</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {/* Seletor de mês */}
+              <View style={s.mesSeletorHeader}>
+                <TouchableOpacity onPress={() => filtroMes === 0 ? (setFiltroMes(11), setFiltroAno(filtroAno-1)) : setFiltroMes(filtroMes-1)}>
+                  <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>‹</Text>
+                </TouchableOpacity>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: C.text }}>{MESES[filtroMes].substring(0,3)} {filtroAno}</Text>
+                <TouchableOpacity onPress={() => filtroMes === 11 ? (setFiltroMes(0), setFiltroAno(filtroAno+1)) : setFiltroMes(filtroMes+1)}>
+                  <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>›</Text>
+                </TouchableOpacity>
+              </View>
+              {Platform.OS !== 'web' && (
+                <TouchableOpacity style={s.avatar} onPress={() => supabase.auth.signOut()}>
+                  <Text style={s.avatarText}>↩</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
-          {/* Hero — saldo do mês atual */}
+          {/* Hero card */}
           <View style={s.heroCard}>
             <View style={s.heroCircle1} pointerEvents="none"/>
             <View style={s.heroCircle2} pointerEvents="none"/>
-            <Text style={s.heroLabel}>Saldo de {MESES[hoje.getMonth()]}</Text>
-            <Text style={[s.heroVal, { color: saldoAtual >= 0 ? '#FFFFFF' : '#FCA5A5' }]}>{fmtSaldo(saldoAtual)}</Text>
+            <Text style={s.heroLabel}>SALDO ATUAL</Text>
+            <Text style={[s.heroVal, { color: saldoFiltroMes >= 0 ? '#FFFFFF' : '#FCA5A5' }]}>{fmtSaldo(saldoFiltroMes)}</Text>
+            <View style={[s.heroBadge, { backgroundColor: saldoFiltroMes >= 0 ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)' }]}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: saldoFiltroMes >= 0 ? '#6EE7B7' : '#FCA5A5' }}>
+                {saldoFiltroMes >= 0 ? '✓ Superávit neste mês' : '↓ Déficit neste mês'}
+              </Text>
+            </View>
             <View style={s.heroRow}>
               <View style={{ flex: 1 }}>
-                <Text style={s.heroSubLabel}>Receitas</Text>
-                <Text style={s.heroSubVal}>{fmt(recAtual)}</Text>
+                <Text style={s.heroSubLabel}>RECEITAS</Text>
+                <Text style={s.heroSubVal}>{fmt(recFiltroMes)}</Text>
+                {pctRec !== null && <Text style={{ fontSize: 11, color: pctRec >= 0 ? '#6EE7B7' : '#FCA5A5', marginTop: 2 }}>{pctRec >= 0 ? '▲' : '▼'} {Math.abs(Math.round(pctRec))}% vs mês ant.</Text>}
               </View>
               <View style={s.heroDivider}/>
               <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <Text style={s.heroSubLabel}>Despesas</Text>
-                <Text style={s.heroSubVal}>{fmt(despAtual)}</Text>
+                <Text style={s.heroSubLabel}>DESPESAS</Text>
+                <Text style={s.heroSubVal}>{fmt(despFiltroMes)}</Text>
+                {pctDesp !== null && <Text style={{ fontSize: 11, color: pctDesp > 0 ? '#FCA5A5' : '#6EE7B7', marginTop: 2 }}>{pctDesp > 0 ? '▲' : '▼'} {Math.abs(Math.round(pctDesp))}% vs mês ant.</Text>}
               </View>
             </View>
           </View>
 
-          {/* Filtros de mês e tipo */}
-          <View style={s.mesNav}>
-            <TouchableOpacity onPress={() => filtroMes === 0 ? (setFiltroMes(11), setFiltroAno(filtroAno-1)) : setFiltroMes(filtroMes-1)} style={s.mesBtn}><Text style={s.mesBtnText}>‹</Text></TouchableOpacity>
-            <Text style={s.mesTitulo}>{mesAno(filtroMes, filtroAno)}</Text>
-            <TouchableOpacity onPress={() => filtroMes === 11 ? (setFiltroMes(0), setFiltroAno(filtroAno+1)) : setFiltroMes(filtroMes+1)} style={s.mesBtn}><Text style={s.mesBtnText}>›</Text></TouchableOpacity>
-          </View>
-
-          <View style={[s.filtros, { justifyContent: 'space-between', alignItems: 'center' }]}>
-            <View style={{ flexDirection: 'row', gap: 6 }}>
-              {(['todas','receita','despesa'] as const).map(f => (
-                <TouchableOpacity key={f} style={[s.filtroBtn, filtro === f && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setFiltro(f)}>
-                  <Text style={[s.filtroBtnText, filtro === f && { color: '#fff' }]}>{f === 'todas' ? 'Todos' : f === 'receita' ? 'Receitas' : 'Despesas'}</Text>
-                </TouchableOpacity>
-              ))}
+          {/* Stats row — 4 cards */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+            <View style={s.statCard}>
+              <View style={[s.statIcone, { backgroundColor: C.receitaBg }]}><Text>↑</Text></View>
+              <Text style={s.statLabel}>Receitas</Text>
+              <Text style={[s.statVal, { color: C.receita }]}>{fmt(recFiltroMes)}</Text>
+              {pctRec !== null && <Text style={[s.statPct, { color: pctRec >= 0 ? C.receita : C.despesa }]}>{pctRec >= 0 ? '+' : ''}{Math.round(pctRec)}% vs {MESES[filtroMesAntIdx].substring(0,3)}</Text>}
             </View>
-            <TouchableOpacity style={[s.filtroBtn, { backgroundColor: C.primaryDark, borderColor: C.primaryDark }]} onPress={() => setShowExportMenu(true)}>
-              <Text style={[s.filtroBtnText, { color: '#fff' }]}>📤 Exportar</Text>
+            <View style={s.statCard}>
+              <View style={[s.statIcone, { backgroundColor: C.despesaBg }]}><Text>↓</Text></View>
+              <Text style={s.statLabel}>Despesas</Text>
+              <Text style={[s.statVal, { color: C.despesa }]}>{fmt(despFiltroMes)}</Text>
+              {pctDesp !== null && <Text style={[s.statPct, { color: pctDesp > 0 ? C.despesa : C.receita }]}>{pctDesp > 0 ? '+' : ''}{Math.round(pctDesp)}% vs {MESES[filtroMesAntIdx].substring(0,3)}</Text>}
+            </View>
+            <View style={s.statCard}>
+              <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}><Text>🏷</Text></View>
+              <Text style={s.statLabel}>Maior categoria</Text>
+              <Text style={[s.statVal, { color: C.text, fontSize: 14 }]}>{maiorCat ? maiorCat[0] : '—'}</Text>
+              {maiorCat && <Text style={s.statPct}>{fmt(maiorCat[1])}</Text>}
+            </View>
+            <View style={s.statCard}>
+              <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}><Text>💰</Text></View>
+              <Text style={s.statLabel}>Previsto fechar</Text>
+              <Text style={[s.statVal, { color: saldoFiltroMes >= 0 ? C.receita : C.despesa, fontSize: 14 }]}>{fmtSaldo(saldoFiltroMes)}</Text>
+              <Text style={[s.statPct, { color: saldoFiltroMes >= 0 ? C.receita : C.despesa }]}>{saldoFiltroMes >= 0 ? 'Superávit' : 'Déficit'}</Text>
+            </View>
+          </ScrollView>
+
+          {/* Busca + filtros + exportar */}
+          <View style={s.buscaRow}>
+            <View style={s.buscaInput}>
+              <Text style={{ fontSize: 14, color: C.textLight, marginRight: 6 }}>🔍</Text>
+              <TextInput
+                style={{ flex: 1, fontSize: 13, color: C.text }}
+                placeholder="Buscar transação..."
+                placeholderTextColor={C.textLight}
+                value={busca}
+                onChangeText={setBusca}
+              />
+              {busca.length > 0 && (
+                <TouchableOpacity onPress={() => setBusca('')}>
+                  <Text style={{ color: C.textLight, fontSize: 13 }}>✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <TouchableOpacity style={s.exportBtn} onPress={() => setShowExportMenu(true)}>
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>📤</Text>
             </TouchableOpacity>
           </View>
+          <View style={[s.filtros, { paddingTop: 0 }]}>
+            {(['todas','receita','despesa'] as const).map(f => (
+              <TouchableOpacity key={f} style={[s.filtroBtn, filtro === f && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setFiltro(f)}>
+                <Text style={[s.filtroBtnText, filtro === f && { color: '#fff' }]}>{f === 'todas' ? 'Todas' : f === 'receita' ? 'Receitas' : 'Despesas'}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-          {/* Lista de transações */}
+          {/* Lista agrupada por data */}
           {carregando ? (
             <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }}/>
           ) : visiveis.length === 0 ? (
             <View style={s.vazioContainer}>
               <Text style={s.vazioEmoji}>💸</Text>
-              <Text style={s.vazioTitulo}>Nenhum lançamento</Text>
-              <Text style={s.vazioSub}>Toque no botão <Text style={{ fontWeight: '700', color: C.primary }}>+</Text> para adicionar sua primeira transação de {MESES[filtroMes]}.</Text>
+              <Text style={s.vazioTitulo}>{busca ? 'Nenhum resultado' : 'Nenhum lançamento'}</Text>
+              <Text style={s.vazioSub}>{busca ? `Nenhuma transação encontrada para "${busca}".` : `Toque no botão + para adicionar sua primeira transação de ${MESES[filtroMes]}.`}</Text>
             </View>
           ) : (
-            visiveis.map(t => (
-              <View key={t.id} style={s.txItem}>
-                <View style={[s.txIcone, { backgroundColor: t.tipo === 'receita' ? C.receitaBg : C.despesaBg }]}>
-                  <Text style={{ fontSize: 16 }}>{ICONES_CAT[t.categoria]}</Text>
-                </View>
-                <View style={s.txInfo}><Text style={s.txDesc}>{t.descricao}</Text><Text style={s.txMeta}>{t.categoria} · {t.data}</Text></View>
-                <Text style={[s.txValor, { color: t.tipo === 'receita' ? C.receita : C.despesa }]}>{t.tipo === 'receita' ? '+' : '-'} {fmt(t.valor)}</Text>
-                <TouchableOpacity onPress={() => abrirEdicao(t)} style={{ padding: 4 }}><Text style={{ fontSize: 15 }}>✏️</Text></TouchableOpacity>
-                <TouchableOpacity onPress={() => remover(t.id)} style={{ padding: 4 }}><Text style={{ color: C.textLight, fontSize: 14 }}>✕</Text></TouchableOpacity>
+            datasOrdenadas.map(dataKey => (
+              <View key={dataKey}>
+                <Text style={s.dataGrupoHeader}>{formatarDataGrupo(dataKey)}</Text>
+                {txAgrupadas[dataKey].map(t => (
+                  <View key={t.id} style={s.txItem}>
+                    <View style={[s.txIcone, { backgroundColor: t.tipo === 'receita' ? C.receitaBg : C.despesaBg }]}>
+                      <Text style={{ fontSize: 16 }}>{ICONES_CAT[t.categoria]}</Text>
+                    </View>
+                    <View style={s.txInfo}>
+                      <Text style={s.txDesc}>{t.descricao}</Text>
+                      <Text style={s.txMeta}>{t.categoria}</Text>
+                    </View>
+                    <Text style={[s.txValor, { color: t.tipo === 'receita' ? C.receita : C.despesa }]}>{t.tipo === 'receita' ? '+' : '-'} {fmt(t.valor)}</Text>
+                    <TouchableOpacity onPress={() => abrirEdicao(t)} style={{ padding: 4 }}><Text style={{ fontSize: 15 }}>✏️</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => remover(t.id)} style={{ padding: 4 }}><Text style={{ color: C.textLight, fontSize: 14 }}>✕</Text></TouchableOpacity>
+                  </View>
+                ))}
               </View>
             ))
           )}
@@ -1098,10 +1250,22 @@ export default function App() {
         </ScrollView>
       )}
 
-      {/* ── FAB ── */}
-      <TouchableOpacity style={s.fab} onPress={() => setShowFormModal(true)} activeOpacity={0.85}>
-        <Text style={s.fabText}>＋</Text>
-      </TouchableOpacity>
+        </View>{/* fim conteúdo principal */}
+      </View>{/* fim layout row */}
+
+      {/* ── FAB (só mobile) ── */}
+      {Platform.OS !== 'web' && (
+        <TouchableOpacity style={s.fab} onPress={() => setShowFormModal(true)} activeOpacity={0.85}>
+          <Text style={s.fabText}>＋</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* FAB web — fixo no canto */}
+      {Platform.OS === 'web' && (
+        <TouchableOpacity style={[s.fab, { bottom: 24 }]} onPress={() => setShowFormModal(true)} activeOpacity={0.85}>
+          <Text style={s.fabText}>＋</Text>
+        </TouchableOpacity>
+      )}
 
       {/* ── Toast ── */}
       {toastVisible && (
@@ -1110,24 +1274,17 @@ export default function App() {
         </View>
       )}
 
-      {/* ── Tab bar (bottom) ── */}
-      <View style={s.tabBar}>
-        {([
-          { key: 'lancamentos', icon: '🏠', label: 'Início' },
-          { key: 'resumo',      icon: '📊', label: 'Resumo' },
-          { key: 'metas',       icon: '🎯', label: alertas.length > 0 ? 'Metas 🔴' : 'Metas' },
-          { key: 'importar',    icon: '📥', label: 'Extrato' },
-        ] as { key: Aba; icon: string; label: string }[]).map(item => (
-          <TouchableOpacity
-            key={item.key}
-            style={[s.tabItem, aba === item.key && s.tabItemAtivo]}
-            onPress={() => setAba(item.key)}
-          >
-            <Text style={s.tabIcon}>{item.icon}</Text>
-            <Text style={[s.tabLabel, aba === item.key && s.tabLabelAtivo]}>{item.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {/* ── Tab bar (só mobile) ── */}
+      {Platform.OS !== 'web' && (
+        <View style={s.tabBar}>
+          {TABS.map(item => (
+            <TouchableOpacity key={item.key} style={[s.tabItem, aba === item.key && s.tabItemAtivo]} onPress={() => setAba(item.key)}>
+              <Text style={s.tabIcon}>{item.icon}</Text>
+              <Text style={[s.tabLabel, aba === item.key && s.tabLabelAtivo]}>{item.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
     </SafeAreaView>
   );
@@ -1157,15 +1314,44 @@ const s = StyleSheet.create({
   toast: { position: 'absolute', bottom: 90, alignSelf: 'center', backgroundColor: C.primaryDeep, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 24, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
   toastText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
+  // Sidebar (web)
+  sidebar: { width: 220, backgroundColor: C.primaryDeep, paddingTop: 24, paddingBottom: 16, paddingHorizontal: 12 },
+  sidebarLogo: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, paddingBottom: 28, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)', marginBottom: 12 },
+  sidebarLogoText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  sidebarItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, marginBottom: 4 },
+  sidebarItemAtivo: { backgroundColor: 'rgba(255,255,255,0.15)' },
+  sidebarIcon: { fontSize: 18, width: 24, textAlign: 'center' },
+  sidebarLabel: { fontSize: 14, color: 'rgba(255,255,255,0.65)' },
+  sidebarLabelAtivo: { color: '#fff', fontWeight: '600' },
+
   // Page headers
-  pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingBottom: 12 },
+  pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 20, paddingBottom: 12 },
   greeting: { fontSize: 13, color: C.label },
-  pageTitle: { fontSize: 22, fontWeight: '600', color: C.text },
+  pageTitle: { fontSize: 22, fontWeight: '700', color: C.text },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  mesSeletorHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.bgCard, borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: C.border },
+
+  // Stats row
+  statCard: { backgroundColor: C.bgCard, borderRadius: 14, padding: 14, marginRight: 10, width: 150, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  statIcone: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  statLabel: { fontSize: 11, color: C.textLight, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.3 },
+  statVal: { fontSize: 15, fontWeight: '700', color: C.text, marginBottom: 2 },
+  statPct: { fontSize: 11, color: C.textLight },
+
+  // Search
+  buscaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, marginBottom: 8 },
+  buscaInput: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: C.border },
+  exportBtn: { backgroundColor: C.primaryDark, borderRadius: 10, padding: 10, alignItems: 'center', justifyContent: 'center' },
+
+  // Date group header
+  dataGrupoHeader: { fontSize: 12, fontWeight: '700', color: C.textLight, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 6 },
+
+  // Hero badge
+  heroBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginBottom: 16 },
 
   // Hero card
-  heroCard: { backgroundColor: C.primary, marginHorizontal: 16, borderRadius: 20, padding: 22, marginBottom: 16, shadowColor: C.primaryDeep, shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 10, overflow: 'hidden' },
+  heroCard: { backgroundColor: C.primary, marginHorizontal: 16, borderRadius: 20, padding: 22, marginBottom: 12, shadowColor: C.primaryDeep, shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 10, overflow: 'hidden' },
   heroCircle1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: '#7C3AED', opacity: 0.35, top: -60, right: -50 },
   heroCircle2: { position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: '#6D28D9', opacity: 0.25, bottom: -30, left: -20 },
   heroLabel: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginBottom: 4, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase' },
