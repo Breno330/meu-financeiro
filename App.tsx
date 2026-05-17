@@ -655,6 +655,42 @@ export default function App() {
 
   const selOFX = txOFX.filter(t => t.selecionada).length;
 
+  // Dados para aba Resumo
+  const mesSeldAnt = mesSel === 0 ? 11 : mesSel - 1;
+  const anoSelAnt  = mesSel === 0 ? anoSel - 1 : anoSel;
+  const txMesSelAnt   = txDoMes(mesSeldAnt, anoSelAnt);
+  const recMesSelAnt  = txMesSelAnt.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
+  const despMesSelAnt = txMesSelAnt.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
+  const pctRecSel  = recMesSelAnt  > 0 ? (receitasMes  - recMesSelAnt)  / recMesSelAnt  * 100 : null;
+  const pctDespSel = despMesSelAnt > 0 ? (despesasMes  - despMesSelAnt) / despMesSelAnt * 100 : null;
+
+  // Tendência histórica — 4 meses
+  const tendencia = Array.from({ length: 4 }, (_, i) => {
+    let m = mesSel - (3 - i), a = anoSel;
+    while (m < 0) { m += 12; a--; }
+    const txM = txDoMes(m, a);
+    const rec  = txM.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
+    const desp = txM.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
+    return { label: MESES[m].substring(0, 3), rec, desp };
+  });
+  const tendMax = Math.max(...tendencia.map(t => Math.max(t.rec, t.desp)), 1);
+
+  // Insights automáticos
+  const insights: string[] = (() => {
+    const r: string[] = [];
+    if (pctDespSel !== null && Math.abs(pctDespSel) > 5)
+      r.push(pctDespSel > 0
+        ? `📈 Despesas aumentaram ${Math.round(pctDespSel)}% vs ${MESES[mesSeldAnt]}.`
+        : `📉 Despesas caíram ${Math.abs(Math.round(pctDespSel))}% vs ${MESES[mesSeldAnt]}. Ótimo!`);
+    if (cats.length > 0 && despesasMes > 0)
+      r.push(`🏷 ${cats[0][0]} foi sua maior despesa (${Math.round(cats[0][1] / despesasMes * 100)}% do total).`);
+    if (saldoMes < 0)
+      r.push(`⚠️ Você gastou ${fmt(Math.abs(saldoMes))} a mais do que recebeu.`);
+    else if (saldoMes > 0 && receitasMes > 0)
+      r.push(`✅ Você economizou ${fmt(saldoMes)} (${Math.round(saldoMes / receitasMes * 100)}% da receita).`);
+    return r.slice(0, 3);
+  })();
+
   function getProgMeta(m: Meta) {
     if (m.tipo === 'saldo') return { atual: saldoAtual, max: m.valor, pct: Math.min(Math.max(saldoAtual/m.valor*100,0),100), ok: saldoAtual >= m.valor };
     const g = txAtual.filter(t => t.tipo === 'despesa' && t.categoria === m.categoria).reduce((s,t) => s+Number(t.valor), 0);
@@ -959,55 +995,117 @@ export default function App() {
       {/* ── Aba: Resumo ── */}
       {aba === 'resumo' && (
         <ScrollView style={s.scroll}>
-          <View style={s.mesNav}>
-            <TouchableOpacity onPress={() => mesSel === 0 ? (setMesSel(11), setAnoSel(anoSel-1)) : setMesSel(mesSel-1)} style={s.mesBtn}><Text style={s.mesBtnText}>‹</Text></TouchableOpacity>
-            <Text style={s.mesTitulo}>{mesAno(mesSel, anoSel)}</Text>
-            <TouchableOpacity onPress={() => mesSel === 11 ? (setMesSel(0), setAnoSel(anoSel+1)) : setMesSel(mesSel+1)} style={s.mesBtn}><Text style={s.mesBtnText}>›</Text></TouchableOpacity>
-          </View>
-          <View style={s.ringRow}>
-            <View style={s.ringItem}>
-              <View style={[s.ring, { backgroundColor: C.receitaBg, borderColor: C.receita }]}><Text style={{ fontSize: 16 }}>↑</Text></View>
-              <Text style={s.ringLabel}>Receitas</Text>
-              <Text style={[s.ringVal, { color: C.receita }]}>{fmt(receitasMes)}</Text>
+
+          {/* Header */}
+          <View style={s.pageHeader}>
+            <View>
+              <Text style={s.greeting}>Análise mensal</Text>
+              <Text style={s.pageTitle}>Resumo</Text>
             </View>
-            <View style={s.ringItem}>
-              <View style={[s.ring, { backgroundColor: C.despesaBg, borderColor: C.despesa }]}><Text style={{ fontSize: 16 }}>↓</Text></View>
-              <Text style={s.ringLabel}>Despesas</Text>
-              <Text style={[s.ringVal, { color: C.despesa }]}>{fmt(despesasMes)}</Text>
-            </View>
-            <View style={s.ringItem}>
-              <View style={[s.ring, { backgroundColor: C.bgAccent, borderColor: C.primary }]}><Text style={{ fontSize: 16 }}>💰</Text></View>
-              <Text style={s.ringLabel}>Saldo</Text>
-              <Text style={[s.ringVal, { color: saldoMes >= 0 ? C.primary : C.despesa }]}>{fmtSaldo(saldoMes)}</Text>
+            <View style={s.mesSeletorHeader}>
+              <TouchableOpacity onPress={() => mesSel === 0 ? (setMesSel(11), setAnoSel(anoSel-1)) : setMesSel(mesSel-1)}>
+                <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>‹</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: C.text }}>{MESES[mesSel].substring(0,3)} {anoSel}</Text>
+              <TouchableOpacity onPress={() => mesSel === 11 ? (setMesSel(0), setAnoSel(anoSel+1)) : setMesSel(mesSel+1)}>
+                <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>›</Text>
+              </TouchableOpacity>
             </View>
           </View>
+
+          {/* Hero do resumo */}
+          <View style={s.heroCard}>
+            <View style={s.heroCircle1} pointerEvents="none"/>
+            <View style={s.heroCircle2} pointerEvents="none"/>
+            <Text style={s.heroLabel}>SALDO DE {MESES[mesSel].toUpperCase()}</Text>
+            <Text style={[s.heroVal, { color: saldoMes >= 0 ? '#fff' : '#FCA5A5' }]}>{fmtSaldo(saldoMes)}</Text>
+            <View style={[s.heroBadge, { backgroundColor: saldoMes >= 0 ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)' }]}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: saldoMes >= 0 ? '#6EE7B7' : '#FCA5A5' }}>
+                {saldoMes >= 0 ? '✓ Superávit neste mês' : '↓ Déficit neste mês'}
+              </Text>
+            </View>
+            <View style={s.heroRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.heroSubLabel}>RECEITAS</Text>
+                <Text style={s.heroSubVal}>{fmt(receitasMes)}</Text>
+                {pctRecSel !== null && <Text style={{ fontSize: 11, color: pctRecSel >= 0 ? '#6EE7B7' : '#FCA5A5', marginTop: 2 }}>{pctRecSel >= 0 ? '▲' : '▼'} {Math.abs(Math.round(pctRecSel))}% vs mês ant.</Text>}
+              </View>
+              <View style={s.heroDivider}/>
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <Text style={s.heroSubLabel}>DESPESAS</Text>
+                <Text style={s.heroSubVal}>{fmt(despesasMes)}</Text>
+                {pctDespSel !== null && <Text style={{ fontSize: 11, color: pctDespSel > 0 ? '#FCA5A5' : '#6EE7B7', marginTop: 2 }}>{pctDespSel > 0 ? '▲' : '▼'} {Math.abs(Math.round(pctDespSel))}% vs mês ant.</Text>}
+              </View>
+            </View>
+          </View>
+
+          {/* Receitas vs Despesas */}
           {(receitasMes > 0 || despesasMes > 0) && (
             <View style={s.section}>
               <Text style={s.sectionTitulo}>Receitas vs Despesas</Text>
-              <View style={s.barComp}>
+              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+                <View style={{ flex: 1, backgroundColor: C.receitaBg, borderRadius: 10, padding: 10 }}>
+                  <Text style={{ fontSize: 11, color: C.receita, fontWeight: '600', marginBottom: 2 }}>RECEITAS</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: C.receita }}>{fmt(receitasMes)}</Text>
+                  <Text style={{ fontSize: 11, color: C.label, marginTop: 2 }}>{receitasMes > 0 ? Math.round(receitasMes/(receitasMes+despesasMes)*100) : 0}% do total</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: C.despesaBg, borderRadius: 10, padding: 10 }}>
+                  <Text style={{ fontSize: 11, color: C.despesa, fontWeight: '600', marginBottom: 2 }}>DESPESAS</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: C.despesa }}>{fmt(despesasMes)}</Text>
+                  <Text style={{ fontSize: 11, color: C.label, marginTop: 2 }}>{despesasMes > 0 ? Math.round(despesasMes/(receitasMes+despesasMes)*100) : 0}% do total</Text>
+                </View>
+              </View>
+              <View style={[s.barComp, { height: 20, borderRadius: 10 }]}>
                 {receitasMes > 0 && <View style={[s.barSeg, { flex: receitasMes, backgroundColor: C.receita }]}/>}
                 {despesasMes > 0 && <View style={[s.barSeg, { flex: despesasMes, backgroundColor: C.despesa }]}/>}
               </View>
-              <View style={{ flexDirection: 'row', gap: 16, marginTop: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: C.receita }}/><Text style={{ fontSize: 13, color: C.label }}>Receitas {receitasMes > 0 ? Math.round(receitasMes/(receitasMes+despesasMes)*100) : 0}%</Text></View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: C.despesa }}/><Text style={{ fontSize: 13, color: C.label }}>Despesas {despesasMes > 0 ? Math.round(despesasMes/(receitasMes+despesasMes)*100) : 0}%</Text></View>
-              </View>
             </View>
           )}
+
+          {/* Tendência histórica */}
+          <View style={s.section}>
+            <Text style={s.sectionTitulo}>Evolução — últimos 4 meses</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: 80, marginBottom: 8 }}>
+              {tendencia.map((t, i) => (
+                <View key={i} style={{ flex: 1, alignItems: 'center' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 60 }}>
+                    <View style={{ width: 10, height: Math.max((t.rec / tendMax) * 60, t.rec > 0 ? 4 : 0), backgroundColor: C.receita, borderRadius: 3 }}/>
+                    <View style={{ width: 10, height: Math.max((t.desp / tendMax) * 60, t.desp > 0 ? 4 : 0), backgroundColor: C.despesa, borderRadius: 3 }}/>
+                  </View>
+                  <Text style={{ fontSize: 10, color: C.textLight, marginTop: 4 }}>{t.label}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={{ flexDirection: 'row', gap: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}><View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: C.receita }}/><Text style={{ fontSize: 12, color: C.label }}>Receitas</Text></View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}><View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: C.despesa }}/><Text style={{ fontSize: 12, color: C.label }}>Despesas</Text></View>
+            </View>
+          </View>
+
+          {/* Despesas por categoria */}
           {cats.length > 0 ? (
             <View style={s.section}>
               <Text style={s.sectionTitulo}>Despesas por categoria</Text>
               <GraficoPizza dados={cats} />
-              {cats.map(([c, v]) => (
-                <View key={c} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
-                  <Text style={{ fontSize: 16, width: 24 }}>{ICONES_CAT[c]}</Text>
-                  <Text style={{ fontSize: 13, color: C.label, width: 90 }}>{c}</Text>
-                  <View style={{ flex: 1, height: 8, backgroundColor: C.bgAccent, borderRadius: 4, overflow: 'hidden' }}>
-                    <View style={{ height: 8, borderRadius: 4, width: `${Math.round(v/maxCat*100)}%` as any, backgroundColor: C.primary }}/>
-                  </View>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: C.text, width: 80, textAlign: 'right' }}>{fmt(v)}</Text>
-                </View>
-              ))}
+              <View style={{ marginTop: 8 }}>
+                {cats.map(([c, v]) => {
+                  const pct = despesasMes > 0 ? Math.round(v / despesasMes * 100) : 0;
+                  const cor = CORES_CAT[c] || C.primary;
+                  return (
+                    <View key={c} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
+                      <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: cor + '20', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 13 }}>{ICONES_CAT[c]}</Text>
+                      </View>
+                      <Text style={{ fontSize: 13, color: C.label, width: 80 }}>{c}</Text>
+                      <View style={{ flex: 1, height: 8, backgroundColor: C.bgAccent, borderRadius: 4, overflow: 'hidden' }}>
+                        <View style={{ height: 8, borderRadius: 4, width: `${pct}%` as any, backgroundColor: cor }}/>
+                      </View>
+                      <Text style={{ fontSize: 11, color: C.label, width: 30, textAlign: 'right' }}>{pct}%</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: C.text, width: 78, textAlign: 'right' }}>{fmt(v)}</Text>
+                    </View>
+                  );
+                })}
+              </View>
             </View>
           ) : (
             <View style={s.vazioContainer}>
@@ -1016,18 +1114,22 @@ export default function App() {
               <Text style={s.vazioSub}>Nenhuma despesa registrada em {mesAno(mesSel, anoSel)}.</Text>
             </View>
           )}
-          {txMes.length > 0 && (
+
+          {/* Insights automáticos */}
+          {insights.length > 0 && (
             <View style={s.section}>
-              <Text style={s.sectionTitulo}>Lançamentos ({txMes.length})</Text>
-              {txMes.map(t => (
-                <View key={t.id} style={[s.txItem, { marginHorizontal: 0 }]}>
-                  <View style={[s.txIcone, { backgroundColor: t.tipo === 'receita' ? C.receitaBg : C.despesaBg }]}><Text style={{ fontSize: 14 }}>{ICONES_CAT[t.categoria]}</Text></View>
-                  <View style={s.txInfo}><Text style={s.txDesc}>{t.descricao}</Text><Text style={s.txMeta}>{t.categoria} · {t.data}</Text></View>
-                  <Text style={[s.txValor, { color: t.tipo === 'receita' ? C.receita : C.despesa }]}>{t.tipo === 'receita' ? '+' : '-'} {fmt(t.valor)}</Text>
+              <Text style={s.sectionTitulo}>💡 Insights</Text>
+              {insights.map((insight, i) => (
+                <View key={i} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: i < insights.length - 1 ? 0.5 : 0, borderBottomColor: C.borderLight }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.bgAccent, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 16 }}>{insight.substring(0, 2)}</Text>
+                  </View>
+                  <Text style={{ flex: 1, fontSize: 13, color: C.label, lineHeight: 20, paddingTop: 8 }}>{insight.substring(2).trim()}</Text>
                 </View>
               ))}
             </View>
           )}
+
           <View style={{ height: 100 }}/>
         </ScrollView>
       )}
