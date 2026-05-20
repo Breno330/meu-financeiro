@@ -2,6 +2,9 @@
 
 # dependencies
 node_modules/
+# Exceção: fontes exportadas pelo expo em dist/assets ficam dentro de node_modules
+!dist/assets/
+!dist/assets/**
 
 # Expo
 .expo/
