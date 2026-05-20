@@ -1,0 +1,519 @@
+import { useState, useMemo, useCallback } from 'react';
+import {
+  View, Text, TextInput, TouchableOpacity, ScrollView,
+  ActivityIndicator, Modal, KeyboardAvoidingView, Platform, StyleSheet, Alert,
+} from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
+import { supabase } from '../supabase';
+import { C, CATEGORIAS, ICONES_CAT, MESES } from '../constants';
+import { fmt, fmtSaldo, saudacao, confirmar } from '../utils/format';
+import type { Transacao, Meta, Tipo } from '../types';
+
+type Props = {
+  transacoes: Transacao[];
+  metas: Meta[];
+  setTransacoes: React.Dispatch<React.SetStateAction<Transacao[]>>;
+  calcularAlertas: (txs: Transacao[], mts: Meta[]) => void;
+  mostrarToast: (msg: string) => void;
+  carregando: boolean;
+};
+
+export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAlertas, mostrarToast, carregando }: Props) {
+  const hoje = new Date();
+
+  // Filtros
+  const [filtroMes, setFiltroMes] = useState(hoje.getMonth());
+  const [filtroAno, setFiltroAno] = useState(hoje.getFullYear());
+  const [filtro, setFiltro] = useState<'todas' | Tipo>('todas');
+  const [busca, setBusca] = useState('');
+
+  // Novo lançamento
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [desc, setDesc] = useState('');
+  const [val, setVal] = useState('');
+  const [tipo, setTipo] = useState<Tipo>('despesa');
+  const [cat, setCat] = useState('Alimentação');
+  const [salvando, setSalvando] = useState(false);
+
+  // Edição
+  const [txEditando, setTxEditando] = useState<Transacao | null>(null);
+  const [editDesc, setEditDesc] = useState('');
+  const [editVal, setEditVal] = useState('');
+  const [editTipo, setEditTipo] = useState<Tipo>('despesa');
+  const [editCat, setEditCat] = useState('Alimentação');
+  const [salvandoEdit, setSalvandoEdit] = useState(false);
+
+  // Export
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  // ── Derivações ──────────────────────────────────────────────────────────────
+  const dados = useMemo(() => {
+    const txFiltroMes = transacoes.filter(t => {
+      const p = t.data?.split('/');
+      return p && parseInt(p[1]) - 1 === filtroMes && parseInt(p[2]) === filtroAno;
+    });
+    const recFiltroMes = txFiltroMes.filter(t => t.tipo === 'receita').reduce((s, t) => s + Number(t.valor), 0);
+    const despFiltroMes = txFiltroMes.filter(t => t.tipo === 'despesa').reduce((s, t) => s + Number(t.valor), 0);
+    const saldoFiltroMes = recFiltroMes - despFiltroMes;
+
+    const filtroMesAntIdx = filtroMes === 0 ? 11 : filtroMes - 1;
+    const filtroAnoAntIdx = filtroMes === 0 ? filtroAno - 1 : filtroAno;
+    const txMesAnt = transacoes.filter(t => {
+      const p = t.data?.split('/');
+      return p && parseInt(p[1]) - 1 === filtroMesAntIdx && parseInt(p[2]) === filtroAnoAntIdx;
+    });
+    const recMesAnt = txMesAnt.filter(t => t.tipo === 'receita').reduce((s, t) => s + Number(t.valor), 0);
+    const despMesAnt = txMesAnt.filter(t => t.tipo === 'despesa').reduce((s, t) => s + Number(t.valor), 0);
+    const pctRec = recMesAnt > 0 ? ((recFiltroMes - recMesAnt) / recMesAnt * 100) : null;
+    const pctDesp = despMesAnt > 0 ? ((despFiltroMes - despMesAnt) / despMesAnt * 100) : null;
+
+    const catMapFiltro: Record<string, number> = {};
+    txFiltroMes.filter(t => t.tipo === 'despesa').forEach(t => { catMapFiltro[t.categoria] = (catMapFiltro[t.categoria] || 0) + Number(t.valor); });
+    const catsFiltro = Object.entries(catMapFiltro).sort((a, b) => b[1] - a[1]);
+    const maiorCat = catsFiltro[0];
+
+    const visiveis = transacoes.filter(t => {
+      const p = t.data?.split('/');
+      const noMes = p && parseInt(p[1]) - 1 === filtroMes && parseInt(p[2]) === filtroAno;
+      const matchTipo = filtro === 'todas' || t.tipo === filtro;
+      const matchBusca = !busca || t.descricao.toLowerCase().includes(busca.toLowerCase()) || t.categoria.toLowerCase().includes(busca.toLowerCase());
+      return noMes && matchTipo && matchBusca;
+    });
+
+    const txAgrupadas = visiveis.reduce((acc, t) => {
+      if (!acc[t.data]) acc[t.data] = [];
+      acc[t.data].push(t);
+      return acc;
+    }, {} as Record<string, Transacao[]>);
+
+    const datasOrdenadas = Object.keys(txAgrupadas).sort((a, b) => {
+      const [da, ma, ya] = a.split('/').map(Number);
+      const [db, mb, yb] = b.split('/').map(Number);
+      return new Date(yb, mb - 1, db).getTime() - new Date(ya, ma - 1, da).getTime();
+    });
+
+    return { txFiltroMes, recFiltroMes, despFiltroMes, saldoFiltroMes, filtroMesAntIdx, pctRec, pctDesp, maiorCat, visiveis, txAgrupadas, datasOrdenadas };
+  }, [transacoes, filtroMes, filtroAno, filtro, busca]);
+
+  const { txFiltroMes, recFiltroMes, despFiltroMes, saldoFiltroMes, filtroMesAntIdx, pctRec, pctDesp, maiorCat, visiveis, txAgrupadas, datasOrdenadas } = dados;
+
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+  const formatarDataGrupo = useCallback((dataStr: string): string => {
+    const hojeStr = hoje.toLocaleDateString('pt-BR');
+    const ontem = new Date(hoje); ontem.setDate(hoje.getDate() - 1);
+    const ontemStr = ontem.toLocaleDateString('pt-BR');
+    if (dataStr === hojeStr) return 'Hoje';
+    if (dataStr === ontemStr) return 'Ontem';
+    const p = dataStr.split('/');
+    if (p.length === 3) return `${parseInt(p[0])} de ${MESES[parseInt(p[1]) - 1]}`;
+    return dataStr;
+  }, [hoje]);
+
+  function navMes(delta: number) {
+    if (delta < 0) {
+      if (filtroMes === 0) { setFiltroMes(11); setFiltroAno(a => a - 1); }
+      else setFiltroMes(m => m - 1);
+    } else {
+      if (filtroMes === 11) { setFiltroMes(0); setFiltroAno(a => a + 1); }
+      else setFiltroMes(m => m + 1);
+    }
+  }
+
+  async function adicionar() {
+    const v = parseFloat(val.replace(/\./g, '').replace(',', '.'));
+    if (!desc.trim() || isNaN(v) || v <= 0) { mostrarToast('⚠️ Preencha descrição e valor corretamente.'); return; }
+    setSalvando(true);
+    try {
+      const { data, error } = await supabase.from('transacoes').insert({
+        descricao: desc.trim(), valor: v, tipo, categoria: cat,
+        data: hoje.toLocaleDateString('pt-BR'),
+      }).select();
+      if (error) throw error;
+      const novas = [data[0], ...transacoes];
+      setTransacoes(novas);
+      setDesc(''); setVal('');
+      calcularAlertas(novas, metas);
+      setShowFormModal(false);
+      mostrarToast('✅ Lançamento adicionado!');
+    } catch (err: any) {
+      mostrarToast(`❌ Erro ao salvar: ${err.message ?? 'tente novamente'}`);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function remover(id: string) {
+    confirmar('Excluir lançamento', 'Tem certeza que deseja excluir este lançamento?', async () => {
+      const { error } = await supabase.from('transacoes').delete().eq('id', id);
+      if (error) { mostrarToast(`❌ Erro ao excluir: ${error.message}`); return; }
+      const novas = transacoes.filter(t => t.id !== id);
+      setTransacoes(novas);
+      calcularAlertas(novas, metas);
+      mostrarToast('🗑 Lançamento excluído');
+    });
+  }
+
+  function abrirEdicao(t: Transacao) {
+    setTxEditando(t);
+    setEditDesc(t.descricao);
+    setEditVal(String(t.valor).replace('.', ','));
+    setEditTipo(t.tipo);
+    setEditCat(t.categoria);
+  }
+
+  async function salvarEdicao() {
+    if (!txEditando) return;
+    const v = parseFloat(editVal.replace(/\./g, '').replace(',', '.'));
+    if (!editDesc.trim() || isNaN(v) || v <= 0) { mostrarToast('⚠️ Preencha descrição e valor corretamente.'); return; }
+    setSalvandoEdit(true);
+    try {
+      const { data, error } = await supabase.from('transacoes')
+        .update({ descricao: editDesc.trim(), valor: v, tipo: editTipo, categoria: editCat })
+        .eq('id', txEditando.id).select();
+      if (error) throw error;
+      const novas = transacoes.map(t => t.id === txEditando.id ? data[0] : t);
+      setTransacoes(novas);
+      calcularAlertas(novas, metas);
+      setTxEditando(null);
+      mostrarToast('✏️ Lançamento atualizado!');
+    } catch (err: any) {
+      mostrarToast(`❌ Erro ao editar: ${err.message ?? 'tente novamente'}`);
+    } finally {
+      setSalvandoEdit(false);
+    }
+  }
+
+  async function exportarCSV() {
+    setShowExportMenu(false);
+    const cab = 'Data,Descrição,Tipo,Categoria,Valor\n';
+    const linhas = txFiltroMes.map(t => `${t.data},"${t.descricao}",${t.tipo},${t.categoria},${t.valor}`).join('\n');
+    if (!linhas) { Alert.alert('Sem dados', 'Nenhum lançamento no período selecionado.'); return; }
+    const path = FileSystem.documentDirectory + `financeiro_${MESES[filtroMes]}_${filtroAno}.csv`;
+    await FileSystem.writeAsStringAsync(path, cab + linhas, { encoding: FileSystem.EncodingType.UTF8 });
+    await Sharing.shareAsync(path, { mimeType: 'text/csv', dialogTitle: 'Exportar relatório' });
+  }
+
+  async function exportarPDF() {
+    setShowExportMenu(false);
+    if (!txFiltroMes.length) { Alert.alert('Sem dados', 'Nenhum lançamento no período selecionado.'); return; }
+    const totalReceitas = txFiltroMes.filter(t => t.tipo === 'receita').reduce((s, t) => s + t.valor, 0);
+    const totalDespesas = txFiltroMes.filter(t => t.tipo === 'despesa').reduce((s, t) => s + t.valor, 0);
+    const saldo = totalReceitas - totalDespesas;
+    const linhas = txFiltroMes.map(t => `<tr><td>${t.data}</td><td>${t.descricao}</td><td>${ICONES_CAT[t.categoria]} ${t.categoria}</td><td style="color:${t.tipo === 'receita' ? '#16a34a' : '#dc2626'}">${t.tipo === 'receita' ? '+' : '-'} ${fmt(t.valor)}</td></tr>`).join('');
+    const html = `<html><head><meta charset="utf-8"/><style>body{font-family:Arial,sans-serif;padding:24px;color:#1e293b}h1{color:#1d4ed8;font-size:22px;margin-bottom:4px}.periodo{color:#64748b;font-size:14px;margin-bottom:20px}.resumo{display:flex;gap:16px;margin-bottom:24px}.card{flex:1;padding:12px 16px;border-radius:8px}.card.receita{background:#dcfce7}.card.despesa{background:#fee2e2}.card.saldo{background:#dbeafe}.card label{font-size:11px;color:#64748b;display:block}.card span{font-size:16px;font-weight:bold}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#1d4ed8;color:white;padding:8px 10px;text-align:left}td{padding:7px 10px;border-bottom:1px solid #e2e8f0}tr:nth-child(even) td{background:#f8fafc}</style></head><body><h1>Relatório Financeiro</h1><div class="periodo">${MESES[filtroMes]} de ${filtroAno}</div><div class="resumo"><div class="card receita"><label>Receitas</label><span>${fmt(totalReceitas)}</span></div><div class="card despesa"><label>Despesas</label><span>${fmt(totalDespesas)}</span></div><div class="card saldo"><label>Saldo</label><span style="color:${saldo >= 0 ? '#16a34a' : '#dc2626'}">${fmtSaldo(saldo)}</span></div></div><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th></tr></thead><tbody>${linhas}</tbody></table></body></html>`;
+    const { uri } = await Print.printToFileAsync({ html });
+    await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Exportar PDF' });
+  }
+
+  return (
+    <>
+      {/* ── Modal: editar lançamento ── */}
+      <Modal visible={!!txEditando} transparent animationType="slide">
+        <View style={s.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={s.modalBox}>
+              <View style={s.modalHandle}/>
+              <Text style={s.modalTitulo}>✏️ Editar lançamento</Text>
+              <TextInput style={s.input} placeholder="Descrição" placeholderTextColor={C.textLight} value={editDesc} onChangeText={setEditDesc}/>
+              <TextInput style={s.input} placeholder="Valor (ex: 2450,00)" placeholderTextColor={C.textLight} value={editVal} onChangeText={setEditVal} keyboardType="decimal-pad"/>
+              <View style={s.row}>
+                <TouchableOpacity style={[s.tipoBtn, editTipo === 'receita' && { backgroundColor: C.receita, borderColor: C.receita }]} onPress={() => setEditTipo('receita')}>
+                  <Text style={[s.tipoBtnText, editTipo === 'receita' && { color: '#fff' }]}>Receita</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.tipoBtn, editTipo === 'despesa' && { backgroundColor: C.despesa, borderColor: C.despesa }]} onPress={() => setEditTipo('despesa')}>
+                  <Text style={[s.tipoBtnText, editTipo === 'despesa' && { color: '#fff' }]}>Despesa</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[s.catScroll, { marginBottom: 12 }]}>
+                {CATEGORIAS.map(c => (
+                  <TouchableOpacity key={c} style={[s.catBtn, editCat === c && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setEditCat(c)}>
+                    <Text style={[s.catBtnText, editCat === c && { color: '#fff' }]}>{ICONES_CAT[c]} {c}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: C.bgAccent }]} onPress={() => setTxEditando(null)}>
+                  <Text style={[s.btnText, { color: C.primaryDark }]}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.btn, { flex: 2, backgroundColor: C.primary, opacity: salvandoEdit ? 0.6 : 1 }]} onPress={salvarEdicao} disabled={salvandoEdit}>
+                  <Text style={[s.btnText, { color: '#fff' }]}>{salvandoEdit ? 'Salvando...' : 'Salvar alterações'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* ── Modal: novo lançamento ── */}
+      <Modal visible={showFormModal} transparent animationType="slide">
+        <View style={s.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={s.modalBox}>
+              <View style={s.modalHandle}/>
+              <Text style={s.modalTitulo}>➕ Novo lançamento</Text>
+              <TextInput style={s.input} placeholder="Descrição" placeholderTextColor={C.textLight} value={desc} onChangeText={setDesc}/>
+              <TextInput style={s.input} placeholder="Valor (ex: 2450,00)" placeholderTextColor={C.textLight} value={val} onChangeText={setVal} keyboardType="decimal-pad"/>
+              <View style={s.row}>
+                <TouchableOpacity style={[s.tipoBtn, tipo === 'receita' && { backgroundColor: C.receita, borderColor: C.receita }]} onPress={() => setTipo('receita')}>
+                  <Text style={[s.tipoBtnText, tipo === 'receita' && { color: '#fff' }]}>↑ Receita</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.tipoBtn, tipo === 'despesa' && { backgroundColor: C.despesa, borderColor: C.despesa }]} onPress={() => setTipo('despesa')}>
+                  <Text style={[s.tipoBtnText, tipo === 'despesa' && { color: '#fff' }]}>↓ Despesa</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.catScroll}>
+                {CATEGORIAS.map(c => (
+                  <TouchableOpacity key={c} style={[s.catBtn, cat === c && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setCat(c)}>
+                    <Text style={[s.catBtnText, cat === c && { color: '#fff' }]}>{ICONES_CAT[c]} {c}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: C.bgAccent }]} onPress={() => { setShowFormModal(false); setDesc(''); setVal(''); }}>
+                  <Text style={[s.btnText, { color: C.primaryDark }]}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.btn, { flex: 2, backgroundColor: C.primary, opacity: salvando ? 0.6 : 1 }]} onPress={adicionar} disabled={salvando}>
+                  <Text style={[s.btnText, { color: '#fff' }]}>{salvando ? 'Salvando...' : 'Salvar lançamento'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* ── Modal: exportar ── */}
+      <Modal visible={showExportMenu} transparent animationType="fade">
+        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowExportMenu(false)}>
+          <View style={[s.modalBox, { paddingBottom: 24 }]}>
+            <View style={s.modalHandle}/>
+            <Text style={s.modalTitulo}>📤 Exportar relatório</Text>
+            <Text style={s.modalSub}>{MESES[filtroMes]} de {filtroAno}</Text>
+            <TouchableOpacity style={[s.exportOpcao, { borderColor: C.receita }]} onPress={exportarCSV}>
+              <Text style={{ fontSize: 28, marginBottom: 4 }}>📊</Text>
+              <Text style={[s.exportOpcaoTitulo, { color: C.receita }]}>Planilha CSV</Text>
+              <Text style={s.exportOpcaoSub}>Abrir no Excel ou Google Sheets</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.exportOpcao, { borderColor: C.despesa }]} onPress={exportarPDF}>
+              <Text style={{ fontSize: 28, marginBottom: 4 }}>📄</Text>
+              <Text style={[s.exportOpcaoTitulo, { color: C.despesa }]}>Relatório PDF</Text>
+              <Text style={s.exportOpcaoSub}>Com resumo e tabela completa</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── Conteúdo ── */}
+      <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+
+        {/* Header */}
+        <View style={s.pageHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.greeting}>{saudacao()} 👋</Text>
+            <Text style={s.pageTitle}>Minhas Finanças</Text>
+            <Text style={{ fontSize: 12, color: C.textLight, marginTop: 2 }}>Aqui está o resumo das suas finanças</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={s.mesSeletor}>
+              <TouchableOpacity onPress={() => navMes(-1)}>
+                <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>‹</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: C.text }}>{MESES[filtroMes].substring(0, 3)} {filtroAno}</Text>
+              <TouchableOpacity onPress={() => navMes(1)}>
+                <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>›</Text>
+              </TouchableOpacity>
+            </View>
+            {Platform.OS !== 'web' && (
+              <TouchableOpacity style={s.avatar} onPress={() => supabase.auth.signOut()}>
+                <Text style={s.avatarText}>↩</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Hero card */}
+        <View style={s.heroCard}>
+          <View style={s.heroCircle1} pointerEvents="none"/>
+          <View style={s.heroCircle2} pointerEvents="none"/>
+          <Text style={s.heroLabel}>SALDO ATUAL</Text>
+          <Text style={[s.heroVal, { color: saldoFiltroMes >= 0 ? '#FFFFFF' : '#FCA5A5' }]}>{fmtSaldo(saldoFiltroMes)}</Text>
+          <View style={[s.heroBadge, { backgroundColor: saldoFiltroMes >= 0 ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)' }]}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: saldoFiltroMes >= 0 ? '#6EE7B7' : '#FCA5A5' }}>
+              {saldoFiltroMes >= 0 ? '✓ Superávit neste mês' : '↓ Déficit neste mês'}
+            </Text>
+          </View>
+          <View style={s.heroRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.heroSubLabel}>RECEITAS</Text>
+              <Text style={s.heroSubVal}>{fmt(recFiltroMes)}</Text>
+              {pctRec !== null && <Text style={{ fontSize: 11, color: pctRec >= 0 ? '#6EE7B7' : '#FCA5A5', marginTop: 2 }}>{pctRec >= 0 ? '▲' : '▼'} {Math.abs(Math.round(pctRec))}% vs mês ant.</Text>}
+            </View>
+            <View style={s.heroDivider}/>
+            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+              <Text style={s.heroSubLabel}>DESPESAS</Text>
+              <Text style={s.heroSubVal}>{fmt(despFiltroMes)}</Text>
+              {pctDesp !== null && <Text style={{ fontSize: 11, color: pctDesp > 0 ? '#FCA5A5' : '#6EE7B7', marginTop: 2 }}>{pctDesp > 0 ? '▲' : '▼'} {Math.abs(Math.round(pctDesp))}% vs mês ant.</Text>}
+            </View>
+          </View>
+        </View>
+
+        {/* Stats row */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+          <View style={s.statCard}>
+            <View style={[s.statIcone, { backgroundColor: C.receitaBg }]}><Text>↑</Text></View>
+            <Text style={s.statLabel}>Receitas</Text>
+            <Text style={[s.statVal, { color: C.receita }]}>{fmt(recFiltroMes)}</Text>
+            {pctRec !== null && <Text style={[s.statPct, { color: pctRec >= 0 ? C.receita : C.despesa }]}>{pctRec >= 0 ? '+' : ''}{Math.round(pctRec)}% vs {MESES[filtroMesAntIdx].substring(0, 3)}</Text>}
+          </View>
+          <View style={s.statCard}>
+            <View style={[s.statIcone, { backgroundColor: C.despesaBg }]}><Text>↓</Text></View>
+            <Text style={s.statLabel}>Despesas</Text>
+            <Text style={[s.statVal, { color: C.despesa }]}>{fmt(despFiltroMes)}</Text>
+            {pctDesp !== null && <Text style={[s.statPct, { color: pctDesp > 0 ? C.despesa : C.receita }]}>{pctDesp > 0 ? '+' : ''}{Math.round(pctDesp)}% vs {MESES[filtroMesAntIdx].substring(0, 3)}</Text>}
+          </View>
+          <View style={s.statCard}>
+            <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}><Text>🏷</Text></View>
+            <Text style={s.statLabel}>Maior categoria</Text>
+            <Text style={[s.statVal, { color: C.text, fontSize: 14 }]}>{maiorCat ? maiorCat[0] : '—'}</Text>
+            {maiorCat && <Text style={s.statPct}>{fmt(maiorCat[1])}</Text>}
+          </View>
+          <View style={s.statCard}>
+            <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}><Text>💰</Text></View>
+            <Text style={s.statLabel}>Previsto fechar</Text>
+            <Text style={[s.statVal, { color: saldoFiltroMes >= 0 ? C.receita : C.despesa, fontSize: 14 }]}>{fmtSaldo(saldoFiltroMes)}</Text>
+            <Text style={[s.statPct, { color: saldoFiltroMes >= 0 ? C.receita : C.despesa }]}>{saldoFiltroMes >= 0 ? 'Superávit' : 'Déficit'}</Text>
+          </View>
+        </ScrollView>
+
+        {/* Busca + exportar */}
+        <View style={s.buscaRow}>
+          <View style={s.buscaInput}>
+            <Text style={{ fontSize: 14, color: C.textLight, marginRight: 6 }}>🔍</Text>
+            <TextInput
+              style={{ flex: 1, fontSize: 13, color: C.text }}
+              placeholder="Buscar transação..." placeholderTextColor={C.textLight}
+              value={busca} onChangeText={setBusca}
+            />
+            {busca.length > 0 && (
+              <TouchableOpacity onPress={() => setBusca('')}>
+                <Text style={{ color: C.textLight, fontSize: 13 }}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity style={s.exportBtn} onPress={() => setShowExportMenu(true)}>
+            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>📤</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Filtros */}
+        <View style={[s.filtros, { paddingTop: 0 }]}>
+          {(['todas', 'receita', 'despesa'] as const).map(f => (
+            <TouchableOpacity key={f} style={[s.filtroBtn, filtro === f && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setFiltro(f)}>
+              <Text style={[s.filtroBtnText, filtro === f && { color: '#fff' }]}>
+                {f === 'todas' ? 'Todas' : f === 'receita' ? 'Receitas' : 'Despesas'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Lista agrupada */}
+        {carregando ? (
+          <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }}/>
+        ) : visiveis.length === 0 ? (
+          <View style={s.vazioContainer}>
+            <Text style={s.vazioEmoji}>💸</Text>
+            <Text style={s.vazioTitulo}>{busca ? 'Nenhum resultado' : 'Nenhum lançamento'}</Text>
+            <Text style={s.vazioSub}>{busca ? `Nenhuma transação encontrada para "${busca}".` : `Toque no botão + para adicionar sua primeira transação de ${MESES[filtroMes]}.`}</Text>
+          </View>
+        ) : (
+          datasOrdenadas.map(dataKey => (
+            <View key={dataKey}>
+              <Text style={s.dataGrupoHeader}>{formatarDataGrupo(dataKey)}</Text>
+              {txAgrupadas[dataKey].map(t => (
+                <View key={t.id} style={s.txItem}>
+                  <View style={[s.txIcone, { backgroundColor: t.tipo === 'receita' ? C.receitaBg : C.despesaBg }]}>
+                    <Text style={{ fontSize: 16 }}>{ICONES_CAT[t.categoria]}</Text>
+                  </View>
+                  <View style={s.txInfo}>
+                    <Text style={s.txDesc}>{t.descricao}</Text>
+                    <Text style={s.txMeta}>{t.categoria}</Text>
+                  </View>
+                  <Text style={[s.txValor, { color: t.tipo === 'receita' ? C.receita : C.despesa }]}>{t.tipo === 'receita' ? '+' : '-'} {fmt(t.valor)}</Text>
+                  <TouchableOpacity onPress={() => abrirEdicao(t)} style={{ padding: 4 }}><Text style={{ fontSize: 15 }}>✏️</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => remover(t.id)} style={{ padding: 4 }}><Text style={{ color: C.textLight, fontSize: 14 }}>✕</Text></TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          ))
+        )}
+        <View style={{ height: 100 }}/>
+      </ScrollView>
+
+      {/* FAB */}
+      <TouchableOpacity style={s.fab} onPress={() => setShowFormModal(true)} activeOpacity={0.85}>
+        <Text style={s.fabText}>＋</Text>
+      </TouchableOpacity>
+    </>
+  );
+}
+
+const s = StyleSheet.create({
+  pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 20, paddingBottom: 12 },
+  greeting: { fontSize: 13, color: C.label },
+  pageTitle: { fontSize: 22, fontWeight: '700', color: C.text },
+  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  mesSeletor: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.bgCard, borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: C.border },
+  heroCard: { backgroundColor: C.primary, marginHorizontal: 16, borderRadius: 20, padding: 22, marginBottom: 12, shadowColor: C.primaryDeep, shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 10, overflow: 'hidden' },
+  heroCircle1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: '#334155', opacity: 0.6, top: -60, right: -50 },
+  heroCircle2: { position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: '#475569', opacity: 0.4, bottom: -30, left: -20 },
+  heroLabel: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginBottom: 4, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase' },
+  heroVal: { fontSize: 36, fontWeight: '700', color: '#fff', letterSpacing: -1, marginBottom: 18 },
+  heroBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginBottom: 16 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, padding: 12 },
+  heroSubLabel: { fontSize: 11, color: 'rgba(255,255,255,0.65)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: 0.3 },
+  heroSubVal: { fontSize: 15, fontWeight: '600', color: '#fff' },
+  heroDivider: { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.25)', marginHorizontal: 20 },
+  statCard: { backgroundColor: C.bgCard, borderRadius: 14, padding: 14, marginRight: 10, width: 150, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  statIcone: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  statLabel: { fontSize: 11, color: C.textLight, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.3 },
+  statVal: { fontSize: 15, fontWeight: '700', color: C.text, marginBottom: 2 },
+  statPct: { fontSize: 11, color: C.textLight },
+  buscaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, marginBottom: 8 },
+  buscaInput: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: C.border },
+  exportBtn: { backgroundColor: C.primaryDark, borderRadius: 10, padding: 10, alignItems: 'center', justifyContent: 'center' },
+  filtros: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, marginBottom: 8 },
+  filtroBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 0.5, borderColor: C.border, backgroundColor: C.bgCard },
+  filtroBtnText: { fontSize: 13, color: C.label },
+  dataGrupoHeader: { fontSize: 12, fontWeight: '700', color: C.textLight, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 6 },
+  txItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard, marginHorizontal: 16, marginBottom: 6, borderRadius: 12, padding: 12, gap: 10, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  txIcone: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  txInfo: { flex: 1 },
+  txDesc: { fontSize: 14, fontWeight: '500', color: C.text },
+  txMeta: { fontSize: 12, color: C.label, marginTop: 2 },
+  txValor: { fontSize: 14, fontWeight: '600' },
+  vazioContainer: { alignItems: 'center', paddingHorizontal: 32, paddingVertical: 40 },
+  vazioEmoji: { fontSize: 48, marginBottom: 12 },
+  vazioTitulo: { fontSize: 16, fontWeight: '600', color: C.text, marginBottom: 6 },
+  vazioSub: { fontSize: 14, color: C.textLight, textAlign: 'center', lineHeight: 22 },
+  input: { borderWidth: 0.5, borderColor: C.border, borderRadius: 10, padding: 10, fontSize: 14, marginBottom: 8, color: C.text, backgroundColor: C.bg },
+  row: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  tipoBtn: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 10, alignItems: 'center', backgroundColor: C.bg },
+  tipoBtnText: { fontSize: 13, fontWeight: '500', color: C.label },
+  catScroll: { marginBottom: 12 },
+  catBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99, borderWidth: 0.5, borderColor: C.border, marginRight: 6, backgroundColor: C.bg },
+  catBtnText: { fontSize: 12, color: C.label },
+  btn: { borderRadius: 10, padding: 12, alignItems: 'center' },
+  btnText: { fontSize: 14, fontWeight: '600' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modalBox: { backgroundColor: C.bgCard, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, borderTopWidth: 0.5, borderTopColor: C.borderLight },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.borderLight, alignSelf: 'center', marginBottom: 16 },
+  modalTitulo: { fontSize: 18, fontWeight: '600', color: C.text, marginBottom: 4 },
+  modalSub: { fontSize: 13, color: C.label, marginBottom: 12 },
+  exportOpcao: { borderWidth: 1.5, borderRadius: 14, padding: 16, marginBottom: 10, alignItems: 'center' },
+  exportOpcaoTitulo: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
+  exportOpcaoSub: { fontSize: 12, color: C.textLight },
+  fab: { position: 'absolute', right: 20, bottom: 24, width: 58, height: 58, borderRadius: 29, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', shadowColor: C.primaryDeep, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 10 },
+  fabText: { fontSize: 28, color: '#fff', lineHeight: 34, marginTop: -2 },
+});
