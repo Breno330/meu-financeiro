@@ -9,7 +9,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { supabase } from '../supabase';
-import { CATEGORIAS, ICONES_CAT, MESES } from '../constants';
+import { ArrowUpRight, ArrowDownRight, Tag, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { CATEGORIAS, ICONES_CAT, MESES, CORES_CAT } from '../constants';
 import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, fmtSaldo, saudacao, confirmar } from '../utils/format';
 import { useBreakpoint } from '../hooks/useBreakpoint';
@@ -26,7 +27,7 @@ type Props = {
 
 export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAlertas, mostrarToast, carregando }: Props) {
   const hoje = new Date();
-  const { heroFontSize, statCardWidth } = useBreakpoint();
+  const { heroFontSize, statCardWidth, isDesktop } = useBreakpoint();
   const { C } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
 
@@ -101,10 +102,10 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
       return new Date(yb, mb - 1, db).getTime() - new Date(ya, ma - 1, da).getTime();
     });
 
-    return { txFiltroMes, recFiltroMes, despFiltroMes, saldoFiltroMes, filtroMesAntIdx, pctRec, pctDesp, maiorCat, visiveis, txAgrupadas, datasOrdenadas };
+    return { txFiltroMes, recFiltroMes, despFiltroMes, saldoFiltroMes, filtroMesAntIdx, pctRec, pctDesp, maiorCat, catsFiltro, visiveis, txAgrupadas, datasOrdenadas };
   }, [transacoes, filtroMes, filtroAno, filtro, busca]);
 
-  const { txFiltroMes, recFiltroMes, despFiltroMes, saldoFiltroMes, filtroMesAntIdx, pctRec, pctDesp, maiorCat, visiveis, txAgrupadas, datasOrdenadas } = dados;
+  const { txFiltroMes, recFiltroMes, despFiltroMes, saldoFiltroMes, filtroMesAntIdx, pctRec, pctDesp, maiorCat, catsFiltro, visiveis, txAgrupadas, datasOrdenadas } = dados;
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
   const formatarDataGrupo = useCallback((dataStr: string): string => {
@@ -312,137 +313,347 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
       </Modal>
 
       {/* ── Conteúdo ── */}
-      <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
 
-        {/* Header */}
-        <View style={s.pageHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.greeting}>{saudacao()} 👋</Text>
-            <Text style={s.pageTitle}>Minhas Finanças</Text>
-            <Text style={{ fontSize: 12, color: C.textLight, marginTop: 2 }}>Aqui está o resumo das suas finanças</Text>
+      {/* Header — sempre largura total */}
+      <View style={s.pageHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.greeting}>{saudacao()} 👋</Text>
+          <Text style={s.pageTitle}>Minhas Finanças</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={s.mesSeletor}>
+            <TouchableOpacity onPress={() => navMes(-1)}>
+              <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>‹</Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: C.text }}>{MESES[filtroMes].substring(0, 3)} {filtroAno}</Text>
+            <TouchableOpacity onPress={() => navMes(1)}>
+              <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>›</Text>
+            </TouchableOpacity>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View style={s.mesSeletor}>
-              <TouchableOpacity onPress={() => navMes(-1)}>
-                <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>‹</Text>
-              </TouchableOpacity>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: C.text }}>{MESES[filtroMes].substring(0, 3)} {filtroAno}</Text>
-              <TouchableOpacity onPress={() => navMes(1)}>
-                <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>›</Text>
+          {Platform.OS !== 'web' && (
+            <TouchableOpacity style={s.avatar} onPress={() => supabase.auth.signOut()}>
+              <Text style={s.avatarText}>↩</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {isDesktop ? (
+        /* ── DESKTOP: duas colunas ── */
+        <View style={{ flex: 1, flexDirection: 'row', overflow: 'hidden' }}>
+
+          {/* Coluna esquerda — conteúdo principal */}
+          <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+
+            {/* Hero */}
+            <HeroCard
+              receitas={recFiltroMes}
+              despesas={despFiltroMes}
+              mes={filtroMes}
+              ano={filtroAno}
+              heroFontSize={heroFontSize}
+              pctRec={pctRec}
+              pctDesp={pctDesp}
+              mesPrevLabel={MESES[filtroMesAntIdx].substring(0, 3)}
+              style={{ marginHorizontal: 16, marginBottom: 12 }}
+            />
+
+            {/* Stat cards — grid de 4 colunas no desktop */}
+            <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 14 }}>
+              <View style={[s.statCard, { flex: 1 }]}>
+                <View style={[s.statIcone, { backgroundColor: C.receitaBg }]}>
+                  <ArrowUpRight size={16} color={C.receita} strokeWidth={2} />
+                </View>
+                <Text style={s.statLabel}>Receitas</Text>
+                <Text style={[s.statVal, { color: C.receita }]}>{fmt(recFiltroMes)}</Text>
+                {pctRec !== null && <Text style={[s.statPct, { color: pctRec >= 0 ? C.receita : C.despesa }]}>{pctRec >= 0 ? '+' : ''}{Math.round(pctRec)}% vs {MESES[filtroMesAntIdx].substring(0, 3)}</Text>}
+              </View>
+              <View style={[s.statCard, { flex: 1 }]}>
+                <View style={[s.statIcone, { backgroundColor: C.despesaBg }]}>
+                  <ArrowDownRight size={16} color={C.despesa} strokeWidth={2} />
+                </View>
+                <Text style={s.statLabel}>Despesas</Text>
+                <Text style={[s.statVal, { color: C.despesa }]}>{fmt(despFiltroMes)}</Text>
+                {pctDesp !== null && <Text style={[s.statPct, { color: pctDesp > 0 ? C.despesa : C.receita }]}>{pctDesp > 0 ? '+' : ''}{Math.round(pctDesp)}% vs {MESES[filtroMesAntIdx].substring(0, 3)}</Text>}
+              </View>
+              <View style={[s.statCard, { flex: 1 }]}>
+                <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}>
+                  <Tag size={16} color={C.label} strokeWidth={1.8} />
+                </View>
+                <Text style={s.statLabel}>Maior categoria</Text>
+                <Text style={[s.statVal, { color: C.text, fontSize: 14 }]}>{maiorCat ? maiorCat[0] : '—'}</Text>
+                {maiorCat && <Text style={s.statPct}>{fmt(maiorCat[1])}</Text>}
+              </View>
+              <View style={[s.statCard, { flex: 1 }]}>
+                <View style={[s.statIcone, { backgroundColor: saldoFiltroMes >= 0 ? C.receitaBg : C.despesaBg }]}>
+                  {saldoFiltroMes >= 0
+                    ? <TrendingUp   size={16} color={C.receita} strokeWidth={2} />
+                    : <TrendingDown size={16} color={C.despesa} strokeWidth={2} />
+                  }
+                </View>
+                <Text style={s.statLabel}>Previsto fechar</Text>
+                <Text style={[s.statVal, { color: saldoFiltroMes >= 0 ? C.receita : C.despesa, fontSize: 14 }]}>{fmtSaldo(saldoFiltroMes)}</Text>
+                <Text style={[s.statPct, { color: saldoFiltroMes >= 0 ? C.receita : C.despesa }]}>{saldoFiltroMes >= 0 ? 'Superávit' : 'Déficit'}</Text>
+              </View>
+            </View>
+
+            {/* Busca + exportar */}
+            <View style={s.buscaRow}>
+              <View style={s.buscaInput}>
+                <Text style={{ fontSize: 14, color: C.textLight, marginRight: 6 }}>🔍</Text>
+                <TextInput
+                  style={{ flex: 1, fontSize: 13, color: C.text }}
+                  placeholder="Buscar transação..." placeholderTextColor={C.textLight}
+                  value={busca} onChangeText={setBusca}
+                />
+                {busca.length > 0 && (
+                  <TouchableOpacity onPress={() => setBusca('')}>
+                    <Text style={{ color: C.textLight, fontSize: 13 }}>✕</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <TouchableOpacity style={s.exportBtn} onPress={() => setShowExportMenu(true)}>
+                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>📤</Text>
               </TouchableOpacity>
             </View>
-            {Platform.OS !== 'web' && (
-              <TouchableOpacity style={s.avatar} onPress={() => supabase.auth.signOut()}>
-                <Text style={s.avatarText}>↩</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
 
-        {/* Hero card */}
-        <HeroCard
-          receitas={recFiltroMes}
-          despesas={despFiltroMes}
-          mes={filtroMes}
-          ano={filtroAno}
-          heroFontSize={heroFontSize}
-          pctRec={pctRec}
-          pctDesp={pctDesp}
-          mesPrevLabel={MESES[filtroMesAntIdx].substring(0, 3)}
-          style={{ marginHorizontal: 16, marginBottom: 12 }}
-        />
-
-        {/* Stats row */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, marginBottom: 8 }}>
-          <View style={[s.statCard, { width: statCardWidth }]}>
-            <View style={[s.statIcone, { backgroundColor: C.receitaBg }]}><Text>↑</Text></View>
-            <Text style={s.statLabel}>Receitas</Text>
-            <Text style={[s.statVal, { color: C.receita }]}>{fmt(recFiltroMes)}</Text>
-            {pctRec !== null && <Text style={[s.statPct, { color: pctRec >= 0 ? C.receita : C.despesa }]}>{pctRec >= 0 ? '+' : ''}{Math.round(pctRec)}% vs {MESES[filtroMesAntIdx].substring(0, 3)}</Text>}
-          </View>
-          <View style={[s.statCard, { width: statCardWidth }]}>
-            <View style={[s.statIcone, { backgroundColor: C.despesaBg }]}><Text>↓</Text></View>
-            <Text style={s.statLabel}>Despesas</Text>
-            <Text style={[s.statVal, { color: C.despesa }]}>{fmt(despFiltroMes)}</Text>
-            {pctDesp !== null && <Text style={[s.statPct, { color: pctDesp > 0 ? C.despesa : C.receita }]}>{pctDesp > 0 ? '+' : ''}{Math.round(pctDesp)}% vs {MESES[filtroMesAntIdx].substring(0, 3)}</Text>}
-          </View>
-          <View style={[s.statCard, { width: statCardWidth }]}>
-            <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}><Text>🏷</Text></View>
-            <Text style={s.statLabel}>Maior categoria</Text>
-            <Text style={[s.statVal, { color: C.text, fontSize: 14 }]}>{maiorCat ? maiorCat[0] : '—'}</Text>
-            {maiorCat && <Text style={s.statPct}>{fmt(maiorCat[1])}</Text>}
-          </View>
-          <View style={[s.statCard, { width: statCardWidth }]}>
-            <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}><Text>💰</Text></View>
-            <Text style={s.statLabel}>Previsto fechar</Text>
-            <Text style={[s.statVal, { color: saldoFiltroMes >= 0 ? C.receita : C.despesa, fontSize: 14 }]}>{fmtSaldo(saldoFiltroMes)}</Text>
-            <Text style={[s.statPct, { color: saldoFiltroMes >= 0 ? C.receita : C.despesa }]}>{saldoFiltroMes >= 0 ? 'Superávit' : 'Déficit'}</Text>
-          </View>
-        </ScrollView>
-
-        {/* Busca + exportar */}
-        <View style={s.buscaRow}>
-          <View style={s.buscaInput}>
-            <Text style={{ fontSize: 14, color: C.textLight, marginRight: 6 }}>🔍</Text>
-            <TextInput
-              style={{ flex: 1, fontSize: 13, color: C.text }}
-              placeholder="Buscar transação..." placeholderTextColor={C.textLight}
-              value={busca} onChangeText={setBusca}
-            />
-            {busca.length > 0 && (
-              <TouchableOpacity onPress={() => setBusca('')}>
-                <Text style={{ color: C.textLight, fontSize: 13 }}>✕</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          <TouchableOpacity style={s.exportBtn} onPress={() => setShowExportMenu(true)}>
-            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>📤</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Filtros */}
-        <View style={[s.filtros, { paddingTop: 0 }]}>
-          {(['todas', 'receita', 'despesa'] as const).map(f => (
-            <TouchableOpacity key={f} style={[s.filtroBtn, filtro === f && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setFiltro(f)}>
-              <Text style={[s.filtroBtnText, filtro === f && { color: '#fff' }]}>
-                {f === 'todas' ? 'Todas' : f === 'receita' ? 'Receitas' : 'Despesas'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Lista agrupada */}
-        {carregando ? (
-          <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }}/>
-        ) : visiveis.length === 0 ? (
-          <View style={s.vazioContainer}>
-            <Text style={s.vazioEmoji}>💸</Text>
-            <Text style={s.vazioTitulo}>{busca ? 'Nenhum resultado' : 'Nenhum lançamento'}</Text>
-            <Text style={s.vazioSub}>{busca ? `Nenhuma transação encontrada para "${busca}".` : `Toque no botão + para adicionar sua primeira transação de ${MESES[filtroMes]}.`}</Text>
-          </View>
-        ) : (
-          datasOrdenadas.map(dataKey => (
-            <View key={dataKey}>
-              <Text style={s.dataGrupoHeader}>{formatarDataGrupo(dataKey)}</Text>
-              {txAgrupadas[dataKey].map(t => (
-                <View key={t.id} style={s.txItem}>
-                  <View style={[s.txIcone, { backgroundColor: t.tipo === 'receita' ? C.receitaBg : C.despesaBg }]}>
-                    <Text style={{ fontSize: 16 }}>{ICONES_CAT[t.categoria]}</Text>
-                  </View>
-                  <View style={s.txInfo}>
-                    <Text style={s.txDesc}>{t.descricao}</Text>
-                    <Text style={s.txMeta}>{t.categoria}</Text>
-                  </View>
-                  <Text style={[s.txValor, { color: t.tipo === 'receita' ? C.receita : C.despesa }]}>{t.tipo === 'receita' ? '+' : '-'} {fmt(t.valor)}</Text>
-                  <TouchableOpacity onPress={() => abrirEdicao(t)} style={{ padding: 4 }}><Text style={{ fontSize: 15 }}>✏️</Text></TouchableOpacity>
-                  <TouchableOpacity onPress={() => remover(t.id)} style={{ padding: 4 }}><Text style={{ color: C.textLight, fontSize: 14 }}>✕</Text></TouchableOpacity>
-                </View>
+            {/* Filtros */}
+            <View style={[s.filtros, { paddingTop: 0 }]}>
+              {(['todas', 'receita', 'despesa'] as const).map(f => (
+                <TouchableOpacity key={f} style={[s.filtroBtn, filtro === f && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setFiltro(f)}>
+                  <Text style={[s.filtroBtnText, filtro === f && { color: '#fff' }]}>
+                    {f === 'todas' ? 'Todas' : f === 'receita' ? 'Receitas' : 'Despesas'}
+                  </Text>
+                </TouchableOpacity>
               ))}
             </View>
-          ))
-        )}
-        <View style={{ height: 100 }}/>
-      </ScrollView>
+
+            {/* Lista */}
+            {carregando ? (
+              <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }}/>
+            ) : visiveis.length === 0 ? (
+              <View style={s.vazioContainer}>
+                <Text style={s.vazioEmoji}>💸</Text>
+                <Text style={s.vazioTitulo}>{busca ? 'Nenhum resultado' : 'Nenhum lançamento'}</Text>
+                <Text style={s.vazioSub}>{busca ? `Nenhuma transação encontrada para "${busca}".` : `Clique em + para adicionar sua primeira transação de ${MESES[filtroMes]}.`}</Text>
+              </View>
+            ) : (
+              datasOrdenadas.map(dataKey => (
+                <View key={dataKey}>
+                  <Text style={s.dataGrupoHeader}>{formatarDataGrupo(dataKey)}</Text>
+                  {txAgrupadas[dataKey].map(t => (
+                    <View key={t.id} style={s.txItem}>
+                      <View style={[s.txIcone, { backgroundColor: t.tipo === 'receita' ? C.receitaBg : C.despesaBg }]}>
+                        <Text style={{ fontSize: 16 }}>{ICONES_CAT[t.categoria]}</Text>
+                      </View>
+                      <View style={s.txInfo}>
+                        <Text style={s.txDesc}>{t.descricao}</Text>
+                        <Text style={s.txMeta}>{t.categoria}</Text>
+                      </View>
+                      <Text style={[s.txValor, { color: t.tipo === 'receita' ? C.receita : C.despesa }]}>{t.tipo === 'receita' ? '+' : '-'} {fmt(t.valor)}</Text>
+                      <TouchableOpacity onPress={() => abrirEdicao(t)} style={{ padding: 4 }}><Text style={{ fontSize: 15 }}>✏️</Text></TouchableOpacity>
+                      <TouchableOpacity onPress={() => remover(t.id)} style={{ padding: 4 }}><Text style={{ color: C.textLight, fontSize: 14 }}>✕</Text></TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              ))
+            )}
+            <View style={{ height: 100 }}/>
+          </ScrollView>
+
+          {/* ── Coluna direita — painel contextual ── */}
+          <View style={s.rightPanel}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingTop: 12 }}>
+
+              {/* Gastos por categoria */}
+              <Text style={s.panelSection}>Gastos por Categoria</Text>
+              {catsFiltro.length === 0 ? (
+                <Text style={{ fontSize: 13, color: C.textLight, marginBottom: 24 }}>Nenhum gasto em {MESES[filtroMes]}.</Text>
+              ) : (
+                catsFiltro.slice(0, 6).map(([cat, val]) => {
+                  const pctBar = catsFiltro[0][1] > 0 ? val / catsFiltro[0][1] : 0;
+                  const pctDesp = despFiltroMes > 0 ? val / despFiltroMes : 0;
+                  return (
+                    <View key={cat} style={{ marginBottom: 16 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <Text style={{ fontSize: 13, color: C.text }}>{ICONES_CAT[cat]} {cat}</Text>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: C.text }}>{fmt(val)}</Text>
+                      </View>
+                      <View style={{ height: 4, backgroundColor: C.bgAccent, borderRadius: 2, overflow: 'hidden' }}>
+                        <View style={{ height: 4, width: `${Math.round(pctBar * 100)}%` as any, backgroundColor: CORES_CAT[cat] || C.despesa, borderRadius: 2 }} />
+                      </View>
+                      <Text style={{ fontSize: 11, color: C.textLight, marginTop: 4 }}>
+                        {Math.round(pctDesp * 100)}% das despesas
+                      </Text>
+                    </View>
+                  );
+                })
+              )}
+
+              {/* Metas do mês */}
+              {(() => {
+                const metasMes = metas.filter(m => m.mes === filtroMes && m.ano === filtroAno);
+                if (metasMes.length === 0) return null;
+                return (
+                  <View style={{ marginTop: 8 }}>
+                    <Text style={s.panelSection}>Metas do Mês</Text>
+                    {metasMes.map((meta, i) => {
+                      let atual = 0;
+                      let pct = 0;
+                      if (meta.tipo === 'saldo') {
+                        atual = saldoFiltroMes;
+                        pct = meta.valor > 0 ? Math.min(Math.max(atual / meta.valor, 0), 1) : 0;
+                      } else if (meta.tipo === 'categoria' && meta.categoria) {
+                        atual = txFiltroMes.filter(t => t.tipo === 'despesa' && t.categoria === meta.categoria).reduce((s, t) => s + Number(t.valor), 0);
+                        pct = meta.valor > 0 ? Math.min(atual / meta.valor, 1) : 0;
+                      }
+                      const ok = meta.tipo === 'saldo' ? atual >= meta.valor : atual <= meta.valor;
+                      const barColor = ok ? C.receita : (pct > 0.8 ? '#F59E0B' : C.despesa);
+                      return (
+                        <View key={i} style={{ marginBottom: 16 }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <Text style={{ fontSize: 13, color: C.text, flex: 1 }}>
+                              {meta.tipo === 'saldo' ? '💰 Saldo mínimo' : `${ICONES_CAT[meta.categoria || '']} ${meta.categoria}`}
+                            </Text>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: ok ? C.receita : C.despesa }}>{ok ? '✓' : '!'}</Text>
+                          </View>
+                          <View style={{ height: 4, backgroundColor: C.bgAccent, borderRadius: 2, overflow: 'hidden' }}>
+                            <View style={{ height: 4, width: `${Math.round(pct * 100)}%` as any, backgroundColor: barColor, borderRadius: 2 }} />
+                          </View>
+                          <Text style={{ fontSize: 11, color: C.textLight, marginTop: 4 }}>
+                            {fmt(Math.abs(atual))} de {fmt(meta.valor)}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                );
+              })()}
+
+            </ScrollView>
+          </View>
+        </View>
+
+      ) : (
+
+        /* ── MOBILE: coluna única ── */
+        <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+
+          <HeroCard
+            receitas={recFiltroMes}
+            despesas={despFiltroMes}
+            mes={filtroMes}
+            ano={filtroAno}
+            heroFontSize={heroFontSize}
+            pctRec={pctRec}
+            pctDesp={pctDesp}
+            mesPrevLabel={MESES[filtroMesAntIdx].substring(0, 3)}
+            style={{ marginHorizontal: 16, marginBottom: 12 }}
+          />
+
+          {/* Stat cards — scroll horizontal no mobile */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+            <View style={[s.statCard, { width: statCardWidth }]}>
+              <View style={[s.statIcone, { backgroundColor: C.receitaBg }]}>
+                <ArrowUpRight size={16} color={C.receita} strokeWidth={2} />
+              </View>
+              <Text style={s.statLabel}>Receitas</Text>
+              <Text style={[s.statVal, { color: C.receita }]}>{fmt(recFiltroMes)}</Text>
+              {pctRec !== null && <Text style={[s.statPct, { color: pctRec >= 0 ? C.receita : C.despesa }]}>{pctRec >= 0 ? '+' : ''}{Math.round(pctRec)}% vs {MESES[filtroMesAntIdx].substring(0, 3)}</Text>}
+            </View>
+            <View style={[s.statCard, { width: statCardWidth }]}>
+              <View style={[s.statIcone, { backgroundColor: C.despesaBg }]}>
+                <ArrowDownRight size={16} color={C.despesa} strokeWidth={2} />
+              </View>
+              <Text style={s.statLabel}>Despesas</Text>
+              <Text style={[s.statVal, { color: C.despesa }]}>{fmt(despFiltroMes)}</Text>
+              {pctDesp !== null && <Text style={[s.statPct, { color: pctDesp > 0 ? C.despesa : C.receita }]}>{pctDesp > 0 ? '+' : ''}{Math.round(pctDesp)}% vs {MESES[filtroMesAntIdx].substring(0, 3)}</Text>}
+            </View>
+            <View style={[s.statCard, { width: statCardWidth }]}>
+              <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}>
+                <Tag size={16} color={C.label} strokeWidth={1.8} />
+              </View>
+              <Text style={s.statLabel}>Maior categoria</Text>
+              <Text style={[s.statVal, { color: C.text, fontSize: 14 }]}>{maiorCat ? maiorCat[0] : '—'}</Text>
+              {maiorCat && <Text style={s.statPct}>{fmt(maiorCat[1])}</Text>}
+            </View>
+            <View style={[s.statCard, { width: statCardWidth }]}>
+              <View style={[s.statIcone, { backgroundColor: saldoFiltroMes >= 0 ? C.receitaBg : C.despesaBg }]}>
+                {saldoFiltroMes >= 0
+                  ? <TrendingUp   size={16} color={C.receita} strokeWidth={2} />
+                  : <TrendingDown size={16} color={C.despesa} strokeWidth={2} />
+                }
+              </View>
+              <Text style={s.statLabel}>Previsto fechar</Text>
+              <Text style={[s.statVal, { color: saldoFiltroMes >= 0 ? C.receita : C.despesa, fontSize: 14 }]}>{fmtSaldo(saldoFiltroMes)}</Text>
+              <Text style={[s.statPct, { color: saldoFiltroMes >= 0 ? C.receita : C.despesa }]}>{saldoFiltroMes >= 0 ? 'Superávit' : 'Déficit'}</Text>
+            </View>
+          </ScrollView>
+
+          {/* Busca + exportar */}
+          <View style={s.buscaRow}>
+            <View style={s.buscaInput}>
+              <Text style={{ fontSize: 14, color: C.textLight, marginRight: 6 }}>🔍</Text>
+              <TextInput
+                style={{ flex: 1, fontSize: 13, color: C.text }}
+                placeholder="Buscar transação..." placeholderTextColor={C.textLight}
+                value={busca} onChangeText={setBusca}
+              />
+              {busca.length > 0 && (
+                <TouchableOpacity onPress={() => setBusca('')}>
+                  <Text style={{ color: C.textLight, fontSize: 13 }}>✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <TouchableOpacity style={s.exportBtn} onPress={() => setShowExportMenu(true)}>
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>📤</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Filtros */}
+          <View style={[s.filtros, { paddingTop: 0 }]}>
+            {(['todas', 'receita', 'despesa'] as const).map(f => (
+              <TouchableOpacity key={f} style={[s.filtroBtn, filtro === f && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setFiltro(f)}>
+                <Text style={[s.filtroBtnText, filtro === f && { color: '#fff' }]}>
+                  {f === 'todas' ? 'Todas' : f === 'receita' ? 'Receitas' : 'Despesas'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Lista agrupada */}
+          {carregando ? (
+            <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }}/>
+          ) : visiveis.length === 0 ? (
+            <View style={s.vazioContainer}>
+              <Text style={s.vazioEmoji}>💸</Text>
+              <Text style={s.vazioTitulo}>{busca ? 'Nenhum resultado' : 'Nenhum lançamento'}</Text>
+              <Text style={s.vazioSub}>{busca ? `Nenhuma transação encontrada para "${busca}".` : `Toque em + para adicionar sua primeira transação de ${MESES[filtroMes]}.`}</Text>
+            </View>
+          ) : (
+            datasOrdenadas.map(dataKey => (
+              <View key={dataKey}>
+                <Text style={s.dataGrupoHeader}>{formatarDataGrupo(dataKey)}</Text>
+                {txAgrupadas[dataKey].map(t => (
+                  <View key={t.id} style={s.txItem}>
+                    <View style={[s.txIcone, { backgroundColor: t.tipo === 'receita' ? C.receitaBg : C.despesaBg }]}>
+                      <Text style={{ fontSize: 16 }}>{ICONES_CAT[t.categoria]}</Text>
+                    </View>
+                    <View style={s.txInfo}>
+                      <Text style={s.txDesc}>{t.descricao}</Text>
+                      <Text style={s.txMeta}>{t.categoria}</Text>
+                    </View>
+                    <Text style={[s.txValor, { color: t.tipo === 'receita' ? C.receita : C.despesa }]}>{t.tipo === 'receita' ? '+' : '-'} {fmt(t.valor)}</Text>
+                    <TouchableOpacity onPress={() => abrirEdicao(t)} style={{ padding: 4 }}><Text style={{ fontSize: 15 }}>✏️</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => remover(t.id)} style={{ padding: 4 }}><Text style={{ color: C.textLight, fontSize: 14 }}>✕</Text></TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            ))
+          )}
+          <View style={{ height: 100 }}/>
+        </ScrollView>
+      )}
 
       {/* FAB */}
       <TouchableOpacity style={s.fab} onPress={() => setShowFormModal(true)} activeOpacity={0.85}>
@@ -455,6 +666,8 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
 function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
   pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 20, paddingBottom: 12 },
+  rightPanel: { width: 300, backgroundColor: C.bgCard, borderLeftWidth: 1, borderLeftColor: C.border },
+  panelSection: { fontSize: 13, fontWeight: '700', color: C.text, marginBottom: 16, marginTop: 4, letterSpacing: -0.2 },
   greeting: { fontSize: 13, color: C.label },
   pageTitle: { fontSize: 22, fontWeight: '700', color: C.text },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
