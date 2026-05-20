@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { T as Text } from '../components/T';
+import { HeroCard } from '../components/HeroCard';
 import { MESES, CORES_CAT } from '../constants';
 import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, fmtSaldo } from '../utils/format';
@@ -130,32 +131,17 @@ export function TelaResumo({ transacoes, metas }: Props) {
       <View style={{ flexDirection: 'row', gap: 12, marginHorizontal: 16, marginBottom: 12 }}>
 
         {/* Hero — saldo */}
-        <View style={[s.heroCard, { flex: 1 }]}>
-          <View style={s.heroCircle1} pointerEvents="none"/>
-          <View style={s.heroCircle2} pointerEvents="none"/>
-          <Text style={s.heroLabel}>SALDO ATUAL</Text>
-          <Text style={[s.heroVal, { fontSize: heroFontSize, color: saldoMes >= 0 ? '#fff' : '#FCA5A5' }]}>{fmtSaldo(saldoMes)}</Text>
-          <View style={[s.heroBadge, { backgroundColor: saldoMes >= 0 ? 'rgba(16,185,129,0.25)' : 'rgba(244,63,94,0.3)', marginBottom: 12 }]}>
-            <Text style={{ fontSize: 11, fontWeight: '700', color: saldoMes >= 0 ? '#6EE7B7' : '#FCA5A5' }}>
-              {saldoMes >= 0 ? '✓ Superávit neste mês' : '↓ Déficit neste mês'}
-            </Text>
-          </View>
-          {gastouPctAMais !== null && gastouPctAMais > 0 && (
-            <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 18 }}>
-              Você gastou <Text style={{ color: '#FCA5A5', fontWeight: '600' }}>{gastouPctAMais}%</Text> a mais do que recebeu.
-            </Text>
-          )}
-          {saldoMes >= 0 && receitasMes > 0 && (
-            <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 18 }}>
-              Economia de <Text style={{ color: '#6EE7B7', fontWeight: '600' }}>{Math.round(saldoMes / receitasMes * 100)}%</Text> da receita.
-            </Text>
-          )}
-          <View style={{ flexDirection: 'row', gap: 3, alignItems: 'flex-end', marginTop: 16, height: 28 }}>
-            {[35,55,42,70,48,80,60].map((h, i) => (
-              <View key={i} style={{ flex: 1, height: Math.round(h * 0.28), borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.15)' }}/>
-            ))}
-          </View>
-        </View>
+        <HeroCard
+          receitas={receitasMes}
+          despesas={despesasMes}
+          mes={mesSel}
+          ano={anoSel}
+          heroFontSize={heroFontSize}
+          pctRec={pctRecSel}
+          pctDesp={pctDespSel}
+          mesPrevLabel={MESES[mesSeldAnt].substring(0, 3)}
+          style={{ flex: 1 }}
+        />
 
         {/* Receitas vs Despesas */}
         <View style={[s.section, { flex: 1.4 }]}>
@@ -323,12 +309,6 @@ export function TelaResumo({ transacoes, metas }: Props) {
 function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
   mesSeletor: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.bgCard, borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: C.border },
-  heroCard: { backgroundColor: C.primary, borderRadius: 20, padding: 22, shadowColor: C.primaryDeep, shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 10, overflow: 'hidden' },
-  heroCircle1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: '#334155', opacity: 0.6, top: -60, right: -50 },
-  heroCircle2: { position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: '#475569', opacity: 0.4, bottom: -30, left: -20 },
-  heroLabel: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginBottom: 4, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase' },
-  heroVal: { fontSize: 36, fontWeight: '700', color: '#fff', letterSpacing: -1, marginBottom: 18 },
-  heroBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginBottom: 16 },
   section: { backgroundColor: C.bgCard, marginBottom: 0, borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   sectionTitulo: { fontSize: 15, fontWeight: '600', color: C.text, marginBottom: 14 },
   statCard: { backgroundColor: C.bgCard, borderRadius: 14, padding: 14, marginRight: 10, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },

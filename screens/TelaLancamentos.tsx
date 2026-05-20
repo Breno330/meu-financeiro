@@ -4,6 +4,7 @@ import {
   ActivityIndicator, Modal, KeyboardAvoidingView, Platform, StyleSheet, Alert,
 } from 'react-native';
 import { T as Text } from '../components/T';
+import { HeroCard } from '../components/HeroCard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
@@ -339,30 +340,17 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
         </View>
 
         {/* Hero card */}
-        <View style={s.heroCard}>
-          <View style={s.heroCircle1} pointerEvents="none"/>
-          <View style={s.heroCircle2} pointerEvents="none"/>
-          <Text style={s.heroLabel}>SALDO ATUAL</Text>
-          <Text style={[s.heroVal, { fontSize: heroFontSize, color: saldoFiltroMes >= 0 ? '#FFFFFF' : '#FCA5A5' }]}>{fmtSaldo(saldoFiltroMes)}</Text>
-          <View style={[s.heroBadge, { backgroundColor: saldoFiltroMes >= 0 ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)' }]}>
-            <Text style={{ fontSize: 11, fontWeight: '700', color: saldoFiltroMes >= 0 ? '#6EE7B7' : '#FCA5A5' }}>
-              {saldoFiltroMes >= 0 ? '✓ Superávit neste mês' : '↓ Déficit neste mês'}
-            </Text>
-          </View>
-          <View style={s.heroRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.heroSubLabel}>RECEITAS</Text>
-              <Text style={s.heroSubVal}>{fmt(recFiltroMes)}</Text>
-              {pctRec !== null && <Text style={{ fontSize: 11, color: pctRec >= 0 ? '#6EE7B7' : '#FCA5A5', marginTop: 2 }}>{pctRec >= 0 ? '▲' : '▼'} {Math.abs(Math.round(pctRec))}% vs mês ant.</Text>}
-            </View>
-            <View style={s.heroDivider}/>
-            <View style={{ flex: 1, alignItems: 'flex-end' }}>
-              <Text style={s.heroSubLabel}>DESPESAS</Text>
-              <Text style={s.heroSubVal}>{fmt(despFiltroMes)}</Text>
-              {pctDesp !== null && <Text style={{ fontSize: 11, color: pctDesp > 0 ? '#FCA5A5' : '#6EE7B7', marginTop: 2 }}>{pctDesp > 0 ? '▲' : '▼'} {Math.abs(Math.round(pctDesp))}% vs mês ant.</Text>}
-            </View>
-          </View>
-        </View>
+        <HeroCard
+          receitas={recFiltroMes}
+          despesas={despFiltroMes}
+          mes={filtroMes}
+          ano={filtroAno}
+          heroFontSize={heroFontSize}
+          pctRec={pctRec}
+          pctDesp={pctDesp}
+          mesPrevLabel={MESES[filtroMesAntIdx].substring(0, 3)}
+          style={{ marginHorizontal: 16, marginBottom: 12 }}
+        />
 
         {/* Stats row */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, marginBottom: 8 }}>
@@ -472,16 +460,6 @@ function makeStyles(C: ColorPalette) {
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 16, fontWeight: '600', color: '#fff' },
   mesSeletor: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.bgCard, borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: C.border },
-  heroCard: { backgroundColor: C.primary, marginHorizontal: 16, borderRadius: 20, padding: 22, marginBottom: 12, shadowColor: C.primaryDeep, shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 10, overflow: 'hidden' },
-  heroCircle1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: '#334155', opacity: 0.6, top: -60, right: -50 },
-  heroCircle2: { position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: '#475569', opacity: 0.4, bottom: -30, left: -20 },
-  heroLabel: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginBottom: 4, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase' },
-  heroVal: { fontSize: 36, fontWeight: '700', color: '#fff', letterSpacing: -1, marginBottom: 18 },
-  heroBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginBottom: 16 },
-  heroRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, padding: 12 },
-  heroSubLabel: { fontSize: 11, color: 'rgba(255,255,255,0.65)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: 0.3 },
-  heroSubVal: { fontSize: 15, fontWeight: '600', color: '#fff' },
-  heroDivider: { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.25)', marginHorizontal: 20 },
   statCard: { backgroundColor: C.bgCard, borderRadius: 14, padding: 14, marginRight: 10, width: 150, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   statIcone: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   statLabel: { fontSize: 11, color: C.textLight, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.3 },
