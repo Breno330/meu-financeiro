@@ -9,7 +9,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { supabase } from '../supabase';
-import { ArrowUpRight, ArrowDownRight, Tag, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { ArrowUpRight, ArrowDownRight, Tag, TrendingUp, TrendingDown, Pencil, X as XIcon } from 'lucide-react-native';
 import { CATEGORIAS, ICONES_CAT, MESES, CORES_CAT } from '../constants';
 import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, fmtSaldo, saudacao, confirmar } from '../utils/format';
@@ -52,6 +52,9 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
   const [editTipo, setEditTipo] = useState<Tipo>('despesa');
   const [editCat, setEditCat] = useState('Alimentação');
   const [salvandoEdit, setSalvandoEdit] = useState(false);
+
+  // Hover (desktop)
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   // Export
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -213,6 +216,40 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
     const html = `<html><head><meta charset="utf-8"/><style>body{font-family:Arial,sans-serif;padding:24px;color:#1e293b}h1{color:#1d4ed8;font-size:22px;margin-bottom:4px}.periodo{color:#64748b;font-size:14px;margin-bottom:20px}.resumo{display:flex;gap:16px;margin-bottom:24px}.card{flex:1;padding:12px 16px;border-radius:8px}.card.receita{background:#dcfce7}.card.despesa{background:#fee2e2}.card.saldo{background:#dbeafe}.card label{font-size:11px;color:#64748b;display:block}.card span{font-size:16px;font-weight:bold}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#1d4ed8;color:white;padding:8px 10px;text-align:left}td{padding:7px 10px;border-bottom:1px solid #e2e8f0}tr:nth-child(even) td{background:#f8fafc}</style></head><body><h1>Relatório Financeiro</h1><div class="periodo">${MESES[filtroMes]} de ${filtroAno}</div><div class="resumo"><div class="card receita"><label>Receitas</label><span>${fmt(totalReceitas)}</span></div><div class="card despesa"><label>Despesas</label><span>${fmt(totalDespesas)}</span></div><div class="card saldo"><label>Saldo</label><span style="color:${saldo >= 0 ? '#16a34a' : '#dc2626'}">${fmtSaldo(saldo)}</span></div></div><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th></tr></thead><tbody>${linhas}</tbody></table></body></html>`;
     const { uri } = await Print.printToFileAsync({ html });
     await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Exportar PDF' });
+  }
+
+  // ── Render row (reutilizado em desktop e mobile) ───────────────────────────
+  function renderTxRow(t: Transacao) {
+    const isHovered = isDesktop && hoveredId === t.id;
+    return (
+      <View
+        key={t.id}
+        style={[s.txItem, isHovered && s.txItemHovered]}
+        // @ts-ignore — React Native Web aceita onMouseEnter/onMouseLeave
+        onMouseEnter={isDesktop ? () => setHoveredId(t.id) : undefined}
+        onMouseLeave={isDesktop ? () => setHoveredId(null) : undefined}
+      >
+        <View style={[s.txIcone, { backgroundColor: t.tipo === 'receita' ? C.receitaBg : C.despesaBg }]}>
+          <Text style={{ fontSize: 16 }}>{ICONES_CAT[t.categoria]}</Text>
+        </View>
+        <View style={s.txInfo}>
+          <Text style={s.txDesc}>{t.descricao}</Text>
+          <Text style={s.txMeta}>{t.categoria}</Text>
+        </View>
+        <Text style={[s.txValor, { color: t.tipo === 'receita' ? C.receita : C.despesa }]}>
+          {t.tipo === 'receita' ? '+' : '-'} {fmt(t.valor)}
+        </Text>
+        {/* Ações — visíveis sempre no mobile, só no hover no desktop */}
+        <View style={[s.txAcoes, { opacity: !isDesktop || isHovered ? 1 : 0 }]}>
+          <TouchableOpacity onPress={() => abrirEdicao(t)} style={s.txAcaoBtn}>
+            <Pencil size={14} color={isHovered ? C.primary : C.label} strokeWidth={1.8} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => remover(t.id)} style={s.txAcaoBtn}>
+            <XIcon size={14} color={isHovered ? C.despesa : C.textLight} strokeWidth={1.8} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -441,20 +478,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
               datasOrdenadas.map(dataKey => (
                 <View key={dataKey}>
                   <Text style={s.dataGrupoHeader}>{formatarDataGrupo(dataKey)}</Text>
-                  {txAgrupadas[dataKey].map(t => (
-                    <View key={t.id} style={s.txItem}>
-                      <View style={[s.txIcone, { backgroundColor: t.tipo === 'receita' ? C.receitaBg : C.despesaBg }]}>
-                        <Text style={{ fontSize: 16 }}>{ICONES_CAT[t.categoria]}</Text>
-                      </View>
-                      <View style={s.txInfo}>
-                        <Text style={s.txDesc}>{t.descricao}</Text>
-                        <Text style={s.txMeta}>{t.categoria}</Text>
-                      </View>
-                      <Text style={[s.txValor, { color: t.tipo === 'receita' ? C.receita : C.despesa }]}>{t.tipo === 'receita' ? '+' : '-'} {fmt(t.valor)}</Text>
-                      <TouchableOpacity onPress={() => abrirEdicao(t)} style={{ padding: 4 }}><Text style={{ fontSize: 15 }}>✏️</Text></TouchableOpacity>
-                      <TouchableOpacity onPress={() => remover(t.id)} style={{ padding: 4 }}><Text style={{ color: C.textLight, fontSize: 14 }}>✕</Text></TouchableOpacity>
-                    </View>
-                  ))}
+                  {txAgrupadas[dataKey].map(t => renderTxRow(t))}
                 </View>
               ))
             )}
@@ -634,20 +658,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
             datasOrdenadas.map(dataKey => (
               <View key={dataKey}>
                 <Text style={s.dataGrupoHeader}>{formatarDataGrupo(dataKey)}</Text>
-                {txAgrupadas[dataKey].map(t => (
-                  <View key={t.id} style={s.txItem}>
-                    <View style={[s.txIcone, { backgroundColor: t.tipo === 'receita' ? C.receitaBg : C.despesaBg }]}>
-                      <Text style={{ fontSize: 16 }}>{ICONES_CAT[t.categoria]}</Text>
-                    </View>
-                    <View style={s.txInfo}>
-                      <Text style={s.txDesc}>{t.descricao}</Text>
-                      <Text style={s.txMeta}>{t.categoria}</Text>
-                    </View>
-                    <Text style={[s.txValor, { color: t.tipo === 'receita' ? C.receita : C.despesa }]}>{t.tipo === 'receita' ? '+' : '-'} {fmt(t.valor)}</Text>
-                    <TouchableOpacity onPress={() => abrirEdicao(t)} style={{ padding: 4 }}><Text style={{ fontSize: 15 }}>✏️</Text></TouchableOpacity>
-                    <TouchableOpacity onPress={() => remover(t.id)} style={{ padding: 4 }}><Text style={{ color: C.textLight, fontSize: 14 }}>✕</Text></TouchableOpacity>
-                  </View>
-                ))}
+                {txAgrupadas[dataKey].map(t => renderTxRow(t))}
               </View>
             ))
           )}
@@ -686,6 +697,9 @@ function makeStyles(C: ColorPalette) {
   filtroBtnText: { fontSize: 13, color: C.label },
   dataGrupoHeader: { fontSize: 12, fontWeight: '700', color: C.textLight, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 6 },
   txItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard, marginHorizontal: 16, marginBottom: 6, borderRadius: 12, padding: 12, gap: 10, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  txItemHovered: { backgroundColor: C.bgAccent },
+  txAcoes: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  txAcaoBtn: { padding: 6, borderRadius: 7 },
   txIcone: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   txInfo: { flex: 1 },
   txDesc: { fontSize: 14, fontWeight: '500', color: C.text },
