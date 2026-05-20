@@ -8,7 +8,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { supabase } from '../supabase';
-import { C, CATEGORIAS, ICONES_CAT, MESES } from '../constants';
+import { CATEGORIAS, ICONES_CAT, MESES } from '../constants';
+import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, fmtSaldo, saudacao, confirmar } from '../utils/format';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import type { Transacao, Meta, Tipo } from '../types';
@@ -25,6 +26,8 @@ type Props = {
 export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAlertas, mostrarToast, carregando }: Props) {
   const hoje = new Date();
   const { heroFontSize, statCardWidth } = useBreakpoint();
+  const { C } = useTheme();
+  const s = useMemo(() => makeStyles(C), [C]);
 
   // Filtros
   const [filtroMes, setFiltroMes] = useState(hoje.getMonth());
@@ -461,7 +464,8 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
   );
 }
 
-const s = StyleSheet.create({
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
   pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 20, paddingBottom: 12 },
   greeting: { fontSize: 13, color: C.label },
   pageTitle: { fontSize: 22, fontWeight: '700', color: C.text },
@@ -519,4 +523,5 @@ const s = StyleSheet.create({
   exportOpcaoSub: { fontSize: 12, color: C.textLight },
   fab: { position: 'absolute', right: 20, bottom: 24, width: 58, height: 58, borderRadius: 29, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', shadowColor: C.primaryDeep, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 10 },
   fabText: { fontSize: 28, color: '#fff', lineHeight: 34, marginTop: -2 },
-});
+  });
+}

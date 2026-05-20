@@ -4,7 +4,8 @@ import { T as Text } from '../components/T';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as DocumentPicker from 'expo-document-picker';
 import { supabase } from '../supabase';
-import { C, CATEGORIAS, ICONES_CAT } from '../constants';
+import { CATEGORIAS, ICONES_CAT } from '../constants';
+import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt } from '../utils/format';
 import { parseOFX } from '../utils/ofx';
 import type { Transacao, Meta, TransacaoOFX, Aba } from '../types';
@@ -19,6 +20,8 @@ type Props = {
 };
 
 export function TelaImportar({ transacoes, metas, setTransacoes, calcularAlertas, mostrarToast, setAba }: Props) {
+  const { C } = useTheme();
+  const s = useMemo(() => makeStyles(C), [C]);
   const [txOFX, setTxOFX] = useState<TransacaoOFX[]>([]);
   const [arquivoNome, setArquivoNome] = useState('');
   const [salvandoOFX, setSalvandoOFX] = useState(false);
@@ -193,7 +196,8 @@ export function TelaImportar({ transacoes, metas, setTransacoes, calcularAlertas
   );
 }
 
-const s = StyleSheet.create({
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
   pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 20, paddingBottom: 12 },
   greeting: { fontSize: 13, color: C.label },
   pageTitle: { fontSize: 22, fontWeight: '700', color: C.text },
@@ -218,4 +222,5 @@ const s = StyleSheet.create({
   vazioEmoji: { fontSize: 48, marginBottom: 12 },
   vazioTitulo: { fontSize: 16, fontWeight: '600', color: C.text, marginBottom: 6 },
   vazioSub: { fontSize: 14, color: C.textLight, textAlign: 'center', lineHeight: 22 },
-});
+  });
+}

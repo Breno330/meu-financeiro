@@ -1,8 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { View, TextInput, TouchableOpacity, ScrollView, Alert, StyleSheet } from 'react-native';
 import { T as Text } from '../components/T';
 import { supabase } from '../supabase';
-import { C, CATEGORIAS, ICONES_CAT, MESES } from '../constants';
+import { CATEGORIAS, ICONES_CAT, MESES } from '../constants';
+import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, confirmar } from '../utils/format';
 import type { Transacao, Meta, Recorrente, Tipo } from '../types';
 
@@ -18,6 +19,8 @@ type Props = {
 
 export function TelaMetas({ transacoes, metas, recorrentes, setMetas, setRecorrentes, calcularAlertas, mostrarToast }: Props) {
   const hoje = new Date();
+  const { C } = useTheme();
+  const s = useMemo(() => makeStyles(C), [C]);
 
   // Meta form
   const [metaTipo, setMetaTipo] = useState<'saldo' | 'categoria'>('saldo');
@@ -303,7 +306,8 @@ export function TelaMetas({ transacoes, metas, recorrentes, setMetas, setRecorre
   );
 }
 
-const s = StyleSheet.create({
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
   pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 20, paddingBottom: 12 },
   greeting: { fontSize: 13, color: C.label },
   pageTitle: { fontSize: 22, fontWeight: '700', color: C.text },
@@ -331,4 +335,5 @@ const s = StyleSheet.create({
   txMeta: { fontSize: 12, color: C.label, marginTop: 2 },
   txValor: { fontSize: 14, fontWeight: '600' },
   borderLight: { borderColor: C.borderLight },
-});
+  });
+}

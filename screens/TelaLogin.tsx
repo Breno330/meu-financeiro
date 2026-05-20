@@ -5,13 +5,14 @@ import {
 } from 'react-native';
 import { T as Text } from '../components/T';
 import { supabase } from '../supabase';
-import { C } from '../constants';
+import { useTheme } from '../contexts/ThemeContext';
 
 export function TelaLogin() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [modo, setModo] = useState<'login' | 'cadastro'>('login');
   const [carregando, setCarregando] = useState(false);
+  const { C } = useTheme();
 
   async function entrar() {
     if (!email.trim() || !senha) { Alert.alert('Preencha todos os campos'); return; }
@@ -117,7 +118,7 @@ export function TelaLogin() {
           </View>
 
           {/* ── Painel direito — formulário ── */}
-          <View style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', padding: 64, borderLeftWidth: 1, borderLeftColor: LP.accentMid }}>
+          <View style={{ flex: 1, backgroundColor: C.bgCard, justifyContent: 'center', alignItems: 'center', padding: 64, borderLeftWidth: 1, borderLeftColor: LP.accentMid }}>
             <View style={{ width: '100%', maxWidth: 380 }}>
               <Text style={{ fontSize: 28, fontWeight: '700', color: LP.text, letterSpacing: -0.5, marginBottom: 6 }}>
                 {modo === 'login' ? 'Bem-vindo de volta' : 'Criar conta'}

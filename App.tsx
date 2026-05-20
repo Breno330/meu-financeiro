@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   View, TouchableOpacity,
   StyleSheet, SafeAreaView, ActivityIndicator, Platform,
@@ -10,9 +10,9 @@ import {
   Inter_400Regular, Inter_500Medium,
   Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold,
 } from '@expo-google-fonts/inter';
-import { Home, BarChart2, Target, Download, LogOut } from 'lucide-react-native';
+import { Home, BarChart2, Target, Download, LogOut, Sun, Moon } from 'lucide-react-native';
 
-import { C } from './constants';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { useToast } from './hooks/useToast';
 import { useBreakpoint } from './hooks/useBreakpoint';
 import { T } from './components/T';
@@ -24,9 +24,24 @@ import { TelaResumo } from './screens/TelaResumo';
 import { TelaMetas } from './screens/TelaMetas';
 import { TelaImportar } from './screens/TelaImportar';
 
+// ── Raiz: injeta ThemeProvider ───────────────────────────────────────────────
+
 export default function App() {
+  return (
+    <ThemeProvider>
+      <AppInner />
+    </ThemeProvider>
+  );
+}
+
+// ── AppInner: lógica e UI (tem acesso ao contexto de tema) ───────────────────
+
+function AppInner() {
   const hoje = new Date();
+  const { C, isDark, toggleTheme } = useTheme();
   const { sidebarWidth, isMobile } = useBreakpoint();
+
+  const s = useMemo(() => makeStyles(C), [C]);
 
   // ── Fontes ──────────────────────────────────────────────────────────────────
   const [fontsLoaded] = useFonts({
@@ -181,12 +196,23 @@ export default function App() {
         {/* Sidebar — só web */}
         {Platform.OS === 'web' && (
           <View style={[s.sidebar, { width: sidebarWidth }]}>
-            {/* Logo */}
+
+            {/* Logo + toggle de tema */}
             <View style={[s.sidebarLogo, compact && { justifyContent: 'center', paddingHorizontal: 0 }]}>
-              <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: C.receita, alignItems: 'center', justifyContent: 'center' }}>
-                <T style={{ fontSize: 16 }}>💰</T>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: C.receita, alignItems: 'center', justifyContent: 'center' }}>
+                  <T style={{ fontSize: 16 }}>💰</T>
+                </View>
+                {!compact && <T style={s.sidebarLogoText}>Meu Financeiro</T>}
               </View>
-              {!compact && <T style={s.sidebarLogoText}>Meu Financeiro</T>}
+              {!compact && (
+                <TouchableOpacity onPress={toggleTheme} style={{ padding: 4, borderRadius: 8 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  {isDark
+                    ? <Sun size={16} color="rgba(255,255,255,0.7)" strokeWidth={1.8} />
+                    : <Moon size={16} color="rgba(255,255,255,0.7)" strokeWidth={1.8} />
+                  }
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* Nav items */}
@@ -210,6 +236,20 @@ export default function App() {
             })}
 
             <View style={{ flex: 1 }}/>
+
+            {/* Toggle tema compacto */}
+            {compact && (
+              <TouchableOpacity
+                style={[s.sidebarItem, { justifyContent: 'center' }]}
+                onPress={toggleTheme}
+              >
+                {isDark
+                  ? <Sun size={ICON_SIZE} color={ICON_COLOR} strokeWidth={1.8} />
+                  : <Moon size={ICON_SIZE} color={ICON_COLOR} strokeWidth={1.8} />
+                }
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
               style={[s.sidebarItem, compact && { justifyContent: 'center' }]}
               onPress={() => supabase.auth.signOut()}
@@ -221,7 +261,7 @@ export default function App() {
         )}
 
         {/* Conteúdo principal */}
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: C.bg }}>
 
           {/* Alertas */}
           {alertas.length > 0 && (
@@ -285,31 +325,35 @@ export default function App() {
   );
 }
 
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.bg },
+// ── Estilos ──────────────────────────────────────────────────────────────────
 
-  // Tab bar
-  tabBar: { flexDirection: 'row', backgroundColor: C.bgCard, borderTopWidth: 0.5, borderTopColor: C.borderLight, paddingBottom: Platform.OS === 'ios' ? 0 : 4, paddingTop: 8 },
-  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 4, gap: 3 },
-  tabItemAtivo: { borderTopWidth: 2, borderTopColor: C.primary, marginTop: -8, paddingTop: 12 },
-  tabLabel: { fontSize: 10, color: C.textLight, fontWeight: '400' },
-  tabLabelAtivo: { color: C.primary, fontWeight: '600' },
+function makeStyles(C: ReturnType<typeof useTheme>['C']) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: C.bg },
 
-  // Toast
-  toast: { position: 'absolute', bottom: 90, alignSelf: 'center', backgroundColor: C.primaryDeep, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 24, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
-  toastText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+    // Tab bar
+    tabBar: { flexDirection: 'row', backgroundColor: C.bgCard, borderTopWidth: 0.5, borderTopColor: C.borderLight, paddingBottom: Platform.OS === 'ios' ? 0 : 4, paddingTop: 8 },
+    tabItem: { flex: 1, alignItems: 'center', paddingVertical: 4, gap: 3 },
+    tabItemAtivo: { borderTopWidth: 2, borderTopColor: C.primary, marginTop: -8, paddingTop: 12 },
+    tabLabel: { fontSize: 10, color: C.textLight, fontWeight: '400' },
+    tabLabelAtivo: { color: C.primary, fontWeight: '600' },
 
-  // Sidebar
-  sidebar: { backgroundColor: C.primaryDeep, paddingTop: 24, paddingBottom: 16, paddingHorizontal: 12 },
-  sidebarLogo: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)', marginBottom: 12 },
-  sidebarLogoText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  sidebarItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 10, marginBottom: 4 },
-  sidebarItemAtivo: { backgroundColor: 'rgba(255,255,255,0.13)' },
-  sidebarLabel: { fontSize: 14, fontWeight: '400', color: 'rgba(255,255,255,0.65)' },
-  sidebarLabelAtivo: { color: '#fff', fontWeight: '600' },
+    // Toast
+    toast: { position: 'absolute', bottom: 90, alignSelf: 'center', backgroundColor: C.primaryDeep, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 24, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
+    toastText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
-  // Alertas
-  alertaBanner: { backgroundColor: '#E24B4A', padding: 10, alignItems: 'center' },
-  alertaBannerText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  alertaItem: { fontSize: 13, color: '#A32D2D', lineHeight: 22, paddingHorizontal: 16, paddingVertical: 4, backgroundColor: '#FCEBEB' },
-});
+    // Sidebar
+    sidebar: { backgroundColor: C.primaryDeep, paddingTop: 24, paddingBottom: 16, paddingHorizontal: 12 },
+    sidebarLogo: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)', marginBottom: 12 },
+    sidebarLogoText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+    sidebarItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 10, marginBottom: 4 },
+    sidebarItemAtivo: { backgroundColor: 'rgba(255,255,255,0.13)' },
+    sidebarLabel: { fontSize: 14, fontWeight: '400', color: 'rgba(255,255,255,0.65)' },
+    sidebarLabelAtivo: { color: '#fff', fontWeight: '600' },
+
+    // Alertas
+    alertaBanner: { backgroundColor: '#E24B4A', padding: 10, alignItems: 'center' },
+    alertaBannerText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+    alertaItem: { fontSize: 13, color: '#A32D2D', lineHeight: 22, paddingHorizontal: 16, paddingVertical: 4, backgroundColor: '#FCEBEB' },
+  });
+}

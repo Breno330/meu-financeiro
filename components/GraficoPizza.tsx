@@ -2,11 +2,12 @@ import { View } from 'react-native';
 import { T as Text } from './T';
 import Svg, { Path } from 'react-native-svg';
 import { CORES_CAT } from '../constants';
-import { C } from '../constants';
+import { useTheme } from '../contexts/ThemeContext';
 
 type Props = { dados: [string, number][] };
 
 export function GraficoPizza({ dados }: Props) {
+  const { C } = useTheme();
   const total = dados.reduce((s, [, v]) => s + v, 0);
   if (total === 0) return null;
 

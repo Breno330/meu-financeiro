@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { T as Text } from '../components/T';
-import { C, MESES, CORES_CAT } from '../constants';
+import { MESES, CORES_CAT } from '../constants';
+import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, fmtSaldo } from '../utils/format';
 import { GraficoPizza } from '../components/GraficoPizza';
 import { useBreakpoint } from '../hooks/useBreakpoint';
@@ -17,6 +18,8 @@ export function TelaResumo({ transacoes, metas }: Props) {
   const [mesSel, setMesSel] = useState(hoje.getMonth());
   const [anoSel, setAnoSel] = useState(hoje.getFullYear());
   const { heroFontSize, statCardWidth } = useBreakpoint();
+  const { C } = useTheme();
+  const s = useMemo(() => makeStyles(C), [C]);
 
   function txDoMes(m: number, a: number) {
     return transacoes.filter(t => {
@@ -317,7 +320,8 @@ export function TelaResumo({ transacoes, metas }: Props) {
   );
 }
 
-const s = StyleSheet.create({
+function makeStyles(C: ColorPalette) {
+  return StyleSheet.create({
   mesSeletor: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.bgCard, borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: C.border },
   heroCard: { backgroundColor: C.primary, borderRadius: 20, padding: 22, shadowColor: C.primaryDeep, shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 10, overflow: 'hidden' },
   heroCircle1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: '#334155', opacity: 0.6, top: -60, right: -50 },
@@ -332,4 +336,5 @@ const s = StyleSheet.create({
   statLabel: { fontSize: 11, color: C.textLight, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.3 },
   statVal: { fontSize: 15, fontWeight: '700', color: C.text, marginBottom: 2 },
   statPct: { fontSize: 11, color: C.textLight },
-});
+  });
+}
