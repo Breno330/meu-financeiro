@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, StyleSheet } from 'react-native';
+import { View, TextInput, TouchableOpacity, ScrollView, Alert, StyleSheet } from 'react-native';
+import { T as Text } from '../components/T';
 import { supabase } from '../supabase';
 import { C, CATEGORIAS, ICONES_CAT, MESES } from '../constants';
 import { fmt, confirmar } from '../utils/format';

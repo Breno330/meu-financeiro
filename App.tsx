@@ -1,13 +1,21 @@
 import { useState, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity,
+  View, TouchableOpacity,
   StyleSheet, SafeAreaView, ActivityIndicator, Platform,
 } from 'react-native';
 import { supabase } from './supabase';
 import type { Session } from '@supabase/supabase-js';
+import {
+  useFonts,
+  Inter_400Regular, Inter_500Medium,
+  Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold,
+} from '@expo-google-fonts/inter';
+import { Home, BarChart2, Target, Download, LogOut } from 'lucide-react-native';
 
-import { C, MESES } from './constants';
+import { C } from './constants';
 import { useToast } from './hooks/useToast';
+import { useBreakpoint } from './hooks/useBreakpoint';
+import { T } from './components/T';
 import type { Transacao, Meta, Recorrente, Aba } from './types';
 
 import { TelaLogin } from './screens/TelaLogin';
@@ -18,6 +26,13 @@ import { TelaImportar } from './screens/TelaImportar';
 
 export default function App() {
   const hoje = new Date();
+  const { sidebarWidth, isMobile } = useBreakpoint();
+
+  // ── Fontes ──────────────────────────────────────────────────────────────────
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular, Inter_500Medium,
+    Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold,
+  });
 
   // ── Auth ────────────────────────────────────────────────────────────────────
   const [session, setSession] = useState<Session | null>(null);
@@ -136,7 +151,7 @@ export default function App() {
   }
 
   // ── Estados de carregamento / auth ──────────────────────────────────────────
-  if (authCarregando) return (
+  if (authCarregando || !fontsLoaded) return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' }}>
       <ActivityIndicator size="large" color={C.primary} />
     </SafeAreaView>
@@ -144,12 +159,18 @@ export default function App() {
 
   if (!session) return <TelaLogin />;
 
-  const TABS = [
-    { key: 'lancamentos' as Aba, icon: '🏠', label: 'Início' },
-    { key: 'resumo' as Aba,      icon: '📊', label: 'Resumo' },
-    { key: 'metas' as Aba,       icon: '🎯', label: alertas.length > 0 ? 'Metas 🔴' : 'Metas' },
-    { key: 'importar' as Aba,    icon: '📥', label: 'Extrato' },
+  const ICON_COLOR_ACTIVE = '#fff';
+  const ICON_COLOR = 'rgba(255,255,255,0.55)';
+  const ICON_SIZE  = 20;
+
+  const TABS: { key: Aba; Icon: React.ComponentType<any>; label: string }[] = [
+    { key: 'lancamentos', Icon: Home,     label: 'Início'  },
+    { key: 'resumo',      Icon: BarChart2, label: 'Resumo'  },
+    { key: 'metas',       Icon: Target,   label: alertas.length > 0 ? 'Metas ●' : 'Metas' },
+    { key: 'importar',    Icon: Download, label: 'Extrato' },
   ];
+
+  const compact = sidebarWidth === 64;
 
   return (
     <SafeAreaView style={s.safe}>
@@ -159,21 +180,42 @@ export default function App() {
 
         {/* Sidebar — só web */}
         {Platform.OS === 'web' && (
-          <View style={s.sidebar}>
-            <View style={s.sidebarLogo}>
-              <Text style={{ fontSize: 22 }}>💰</Text>
-              <Text style={s.sidebarLogoText}>Meu Financeiro</Text>
+          <View style={[s.sidebar, { width: sidebarWidth }]}>
+            {/* Logo */}
+            <View style={[s.sidebarLogo, compact && { justifyContent: 'center', paddingHorizontal: 0 }]}>
+              <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: C.receita, alignItems: 'center', justifyContent: 'center' }}>
+                <T style={{ fontSize: 16 }}>💰</T>
+              </View>
+              {!compact && <T style={s.sidebarLogoText}>Meu Financeiro</T>}
             </View>
-            {TABS.map(item => (
-              <TouchableOpacity key={item.key} style={[s.sidebarItem, aba === item.key && s.sidebarItemAtivo]} onPress={() => setAba(item.key)}>
-                <Text style={s.sidebarIcon}>{item.icon}</Text>
-                <Text style={[s.sidebarLabel, aba === item.key && s.sidebarLabelAtivo]}>{item.label}</Text>
-              </TouchableOpacity>
-            ))}
+
+            {/* Nav items */}
+            {TABS.map(({ key, Icon, label }) => {
+              const active = aba === key;
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={[s.sidebarItem, active && s.sidebarItemAtivo, compact && { justifyContent: 'center' }]}
+                  onPress={() => setAba(key)}
+                >
+                  <Icon size={ICON_SIZE} color={active ? ICON_COLOR_ACTIVE : ICON_COLOR} strokeWidth={active ? 2.2 : 1.8} />
+                  {!compact && (
+                    <T style={[s.sidebarLabel, active && s.sidebarLabelAtivo]}>{label}</T>
+                  )}
+                  {compact && alertas.length > 0 && key === 'metas' && (
+                    <View style={{ position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: 4, backgroundColor: C.despesa }} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+
             <View style={{ flex: 1 }}/>
-            <TouchableOpacity style={s.sidebarItem} onPress={() => supabase.auth.signOut()}>
-              <Text style={s.sidebarIcon}>↩</Text>
-              <Text style={s.sidebarLabel}>Sair</Text>
+            <TouchableOpacity
+              style={[s.sidebarItem, compact && { justifyContent: 'center' }]}
+              onPress={() => supabase.auth.signOut()}
+            >
+              <LogOut size={ICON_SIZE} color={ICON_COLOR} strokeWidth={1.8} />
+              {!compact && <T style={s.sidebarLabel}>Sair</T>}
             </TouchableOpacity>
           </View>
         )}
@@ -184,10 +226,10 @@ export default function App() {
           {/* Alertas */}
           {alertas.length > 0 && (
             <TouchableOpacity style={s.alertaBanner} onPress={() => setShowAlertas(!showAlertas)}>
-              <Text style={s.alertaBannerText}>🚨 {alertas.length} alerta{alertas.length > 1 ? 's' : ''} — toque para ver</Text>
+              <T style={s.alertaBannerText}>🚨 {alertas.length} alerta{alertas.length > 1 ? 's' : ''} — toque para ver</T>
             </TouchableOpacity>
           )}
-          {showAlertas && alertas.map((a, i) => <Text key={i} style={s.alertaItem}>{a}</Text>)}
+          {showAlertas && alertas.map((a, i) => <T key={i} style={s.alertaItem}>{a}</T>)}
 
           {/* Telas */}
           {aba === 'lancamentos' && (
@@ -220,19 +262,22 @@ export default function App() {
       {/* Toast */}
       {toastVisible && (
         <View style={s.toast} pointerEvents="none">
-          <Text style={s.toastText}>{toastMsg}</Text>
+          <T style={s.toastText}>{toastMsg}</T>
         </View>
       )}
 
       {/* Tab bar — só mobile */}
       {Platform.OS !== 'web' && (
         <View style={s.tabBar}>
-          {TABS.map(item => (
-            <TouchableOpacity key={item.key} style={[s.tabItem, aba === item.key && s.tabItemAtivo]} onPress={() => setAba(item.key)}>
-              <Text style={s.tabIcon}>{item.icon}</Text>
-              <Text style={[s.tabLabel, aba === item.key && s.tabLabelAtivo]}>{item.label}</Text>
-            </TouchableOpacity>
-          ))}
+          {TABS.map(({ key, Icon, label }) => {
+            const active = aba === key;
+            return (
+              <TouchableOpacity key={key} style={[s.tabItem, active && s.tabItemAtivo]} onPress={() => setAba(key)}>
+                <Icon size={22} color={active ? C.primary : C.textLight} strokeWidth={active ? 2.2 : 1.8} />
+                <T style={[s.tabLabel, active && s.tabLabelAtivo]}>{label}</T>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
 
@@ -244,11 +289,10 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
 
   // Tab bar
-  tabBar: { flexDirection: 'row', backgroundColor: C.bgCard, borderTopWidth: 0.5, borderTopColor: C.borderLight, paddingBottom: Platform.OS === 'ios' ? 0 : 4, paddingTop: 6 },
-  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 4 },
-  tabItemAtivo: { borderTopWidth: 2, borderTopColor: C.primary, marginTop: -6, paddingTop: 10 },
-  tabIcon: { fontSize: 20, marginBottom: 2 },
-  tabLabel: { fontSize: 10, color: C.textLight },
+  tabBar: { flexDirection: 'row', backgroundColor: C.bgCard, borderTopWidth: 0.5, borderTopColor: C.borderLight, paddingBottom: Platform.OS === 'ios' ? 0 : 4, paddingTop: 8 },
+  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 4, gap: 3 },
+  tabItemAtivo: { borderTopWidth: 2, borderTopColor: C.primary, marginTop: -8, paddingTop: 12 },
+  tabLabel: { fontSize: 10, color: C.textLight, fontWeight: '400' },
   tabLabelAtivo: { color: C.primary, fontWeight: '600' },
 
   // Toast
@@ -256,13 +300,12 @@ const s = StyleSheet.create({
   toastText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
   // Sidebar
-  sidebar: { width: 220, backgroundColor: C.primaryDeep, paddingTop: 24, paddingBottom: 16, paddingHorizontal: 12 },
-  sidebarLogo: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, paddingBottom: 28, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)', marginBottom: 12 },
+  sidebar: { backgroundColor: C.primaryDeep, paddingTop: 24, paddingBottom: 16, paddingHorizontal: 12 },
+  sidebarLogo: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)', marginBottom: 12 },
   sidebarLogoText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  sidebarItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, marginBottom: 4 },
-  sidebarItemAtivo: { backgroundColor: 'rgba(255,255,255,0.15)' },
-  sidebarIcon: { fontSize: 18, width: 24, textAlign: 'center' },
-  sidebarLabel: { fontSize: 14, color: 'rgba(255,255,255,0.65)' },
+  sidebarItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 10, marginBottom: 4 },
+  sidebarItemAtivo: { backgroundColor: 'rgba(255,255,255,0.13)' },
+  sidebarLabel: { fontSize: 14, fontWeight: '400', color: 'rgba(255,255,255,0.65)' },
   sidebarLabelAtivo: { color: '#fff', fontWeight: '600' },
 
   // Alertas

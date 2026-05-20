@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { T as Text } from '../components/T';
 import { C, MESES, CORES_CAT } from '../constants';
 import { fmt, fmtSaldo } from '../utils/format';
 import { GraficoPizza } from '../components/GraficoPizza';
+import { useBreakpoint } from '../hooks/useBreakpoint';
 import type { Transacao, Meta } from '../types';
 
 type Props = {
@@ -14,6 +16,7 @@ export function TelaResumo({ transacoes, metas }: Props) {
   const hoje = new Date();
   const [mesSel, setMesSel] = useState(hoje.getMonth());
   const [anoSel, setAnoSel] = useState(hoje.getFullYear());
+  const { heroFontSize, statCardWidth } = useBreakpoint();
 
   function txDoMes(m: number, a: number) {
     return transacoes.filter(t => {
@@ -128,7 +131,7 @@ export function TelaResumo({ transacoes, metas }: Props) {
           <View style={s.heroCircle1} pointerEvents="none"/>
           <View style={s.heroCircle2} pointerEvents="none"/>
           <Text style={s.heroLabel}>SALDO ATUAL</Text>
-          <Text style={[s.heroVal, { fontSize: 28, color: saldoMes >= 0 ? '#fff' : '#FCA5A5' }]}>{fmtSaldo(saldoMes)}</Text>
+          <Text style={[s.heroVal, { fontSize: heroFontSize, color: saldoMes >= 0 ? '#fff' : '#FCA5A5' }]}>{fmtSaldo(saldoMes)}</Text>
           <View style={[s.heroBadge, { backgroundColor: saldoMes >= 0 ? 'rgba(16,185,129,0.25)' : 'rgba(244,63,94,0.3)', marginBottom: 12 }]}>
             <Text style={{ fontSize: 11, fontWeight: '700', color: saldoMes >= 0 ? '#6EE7B7' : '#FCA5A5' }}>
               {saldoMes >= 0 ? '✓ Superávit neste mês' : '↓ Déficit neste mês'}
@@ -186,7 +189,7 @@ export function TelaResumo({ transacoes, metas }: Props) {
 
       {/* ── Linha 2: 4 cards de stats ── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, marginBottom: 12 }}>
-        <View style={[s.statCard, { width: 160 }]}>
+        <View style={[s.statCard, { width: statCardWidth }]}>
           <View style={[s.statIcone, { backgroundColor: C.receitaBg }]}><Text style={{ fontSize: 16 }}>📈</Text></View>
           <Text style={s.statLabel}>Receitas</Text>
           <Text style={[s.statVal, { color: C.receita }]}>{fmt(receitasMes)}</Text>
@@ -196,7 +199,7 @@ export function TelaResumo({ transacoes, metas }: Props) {
             </Text>
           )}
         </View>
-        <View style={[s.statCard, { width: 160 }]}>
+        <View style={[s.statCard, { width: statCardWidth }]}>
           <View style={[s.statIcone, { backgroundColor: C.despesaBg }]}><Text style={{ fontSize: 16 }}>📉</Text></View>
           <Text style={s.statLabel}>Despesas</Text>
           <Text style={[s.statVal, { color: C.despesa }]}>{fmt(despesasMes)}</Text>
@@ -206,7 +209,7 @@ export function TelaResumo({ transacoes, metas }: Props) {
             </Text>
           )}
         </View>
-        <View style={[s.statCard, { width: 160 }]}>
+        <View style={[s.statCard, { width: statCardWidth }]}>
           <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}><Text style={{ fontSize: 16 }}>💰</Text></View>
           <Text style={s.statLabel}>Diferença</Text>
           <Text style={[s.statVal, { color: saldoMes >= 0 ? C.receita : C.despesa }]}>{fmtSaldo(saldoMes)}</Text>
@@ -214,7 +217,7 @@ export function TelaResumo({ transacoes, metas }: Props) {
             {saldoMes >= 0 ? 'Superávit' : `Déficit de ${gastouPctAMais ?? 0}%`}
           </Text>
         </View>
-        <View style={[s.statCard, { width: 160 }]}>
+        <View style={[s.statCard, { width: statCardWidth }]}>
           <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}><Text style={{ fontSize: 16 }}>📅</Text></View>
           <Text style={s.statLabel}>Média diária</Text>
           <Text style={[s.statVal, { color: C.text }]}>{mediaDiaria > 0 ? fmt(mediaDiaria) : '—'}</Text>

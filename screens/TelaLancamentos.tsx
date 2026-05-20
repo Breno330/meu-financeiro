@@ -1,14 +1,16 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, ScrollView,
+  View, TextInput, TouchableOpacity, ScrollView,
   ActivityIndicator, Modal, KeyboardAvoidingView, Platform, StyleSheet, Alert,
 } from 'react-native';
+import { T as Text } from '../components/T';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { supabase } from '../supabase';
 import { C, CATEGORIAS, ICONES_CAT, MESES } from '../constants';
 import { fmt, fmtSaldo, saudacao, confirmar } from '../utils/format';
+import { useBreakpoint } from '../hooks/useBreakpoint';
 import type { Transacao, Meta, Tipo } from '../types';
 
 type Props = {
@@ -22,6 +24,7 @@ type Props = {
 
 export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAlertas, mostrarToast, carregando }: Props) {
   const hoje = new Date();
+  const { heroFontSize, statCardWidth } = useBreakpoint();
 
   // Filtros
   const [filtroMes, setFiltroMes] = useState(hoje.getMonth());
@@ -337,7 +340,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
           <View style={s.heroCircle1} pointerEvents="none"/>
           <View style={s.heroCircle2} pointerEvents="none"/>
           <Text style={s.heroLabel}>SALDO ATUAL</Text>
-          <Text style={[s.heroVal, { color: saldoFiltroMes >= 0 ? '#FFFFFF' : '#FCA5A5' }]}>{fmtSaldo(saldoFiltroMes)}</Text>
+          <Text style={[s.heroVal, { fontSize: heroFontSize, color: saldoFiltroMes >= 0 ? '#FFFFFF' : '#FCA5A5' }]}>{fmtSaldo(saldoFiltroMes)}</Text>
           <View style={[s.heroBadge, { backgroundColor: saldoFiltroMes >= 0 ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)' }]}>
             <Text style={{ fontSize: 11, fontWeight: '700', color: saldoFiltroMes >= 0 ? '#6EE7B7' : '#FCA5A5' }}>
               {saldoFiltroMes >= 0 ? '✓ Superávit neste mês' : '↓ Déficit neste mês'}
@@ -360,25 +363,25 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
 
         {/* Stats row */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, marginBottom: 8 }}>
-          <View style={s.statCard}>
+          <View style={[s.statCard, { width: statCardWidth }]}>
             <View style={[s.statIcone, { backgroundColor: C.receitaBg }]}><Text>↑</Text></View>
             <Text style={s.statLabel}>Receitas</Text>
             <Text style={[s.statVal, { color: C.receita }]}>{fmt(recFiltroMes)}</Text>
             {pctRec !== null && <Text style={[s.statPct, { color: pctRec >= 0 ? C.receita : C.despesa }]}>{pctRec >= 0 ? '+' : ''}{Math.round(pctRec)}% vs {MESES[filtroMesAntIdx].substring(0, 3)}</Text>}
           </View>
-          <View style={s.statCard}>
+          <View style={[s.statCard, { width: statCardWidth }]}>
             <View style={[s.statIcone, { backgroundColor: C.despesaBg }]}><Text>↓</Text></View>
             <Text style={s.statLabel}>Despesas</Text>
             <Text style={[s.statVal, { color: C.despesa }]}>{fmt(despFiltroMes)}</Text>
             {pctDesp !== null && <Text style={[s.statPct, { color: pctDesp > 0 ? C.despesa : C.receita }]}>{pctDesp > 0 ? '+' : ''}{Math.round(pctDesp)}% vs {MESES[filtroMesAntIdx].substring(0, 3)}</Text>}
           </View>
-          <View style={s.statCard}>
+          <View style={[s.statCard, { width: statCardWidth }]}>
             <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}><Text>🏷</Text></View>
             <Text style={s.statLabel}>Maior categoria</Text>
             <Text style={[s.statVal, { color: C.text, fontSize: 14 }]}>{maiorCat ? maiorCat[0] : '—'}</Text>
             {maiorCat && <Text style={s.statPct}>{fmt(maiorCat[1])}</Text>}
           </View>
-          <View style={s.statCard}>
+          <View style={[s.statCard, { width: statCardWidth }]}>
             <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}><Text>💰</Text></View>
             <Text style={s.statLabel}>Previsto fechar</Text>
             <Text style={[s.statVal, { color: saldoFiltroMes >= 0 ? C.receita : C.despesa, fontSize: 14 }]}>{fmtSaldo(saldoFiltroMes)}</Text>

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity,
+  View, TextInput, TouchableOpacity,
   SafeAreaView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { T as Text } from '../components/T';
 import { supabase } from '../supabase';
 import { C } from '../constants';
 

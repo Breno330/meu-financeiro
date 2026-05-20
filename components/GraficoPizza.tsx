@@ -1,4 +1,5 @@
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
+import { T as Text } from './T';
 import Svg, { Path } from 'react-native-svg';
 import { CORES_CAT } from '../constants';
 import { C } from '../constants';
