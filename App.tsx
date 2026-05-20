@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
-  View, TouchableOpacity,
+  View, TouchableOpacity, Image,
   StyleSheet, SafeAreaView, ActivityIndicator, Platform,
 } from 'react-native';
 import { supabase } from './supabase';
@@ -199,12 +199,19 @@ function AppInner() {
 
             {/* Logo + toggle de tema */}
             <View style={[s.sidebarLogo, compact && { justifyContent: 'center', paddingHorizontal: 0 }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+              {compact ? (
                 <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: C.receita, alignItems: 'center', justifyContent: 'center' }}>
                   <T style={{ fontSize: 16 }}>💰</T>
                 </View>
-                {!compact && <T style={s.sidebarLogoText}>Meu Financeiro</T>}
-              </View>
+              ) : (
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                  <Image
+                    source={require('./assets/logo-dark.svg')}
+                    style={{ width: 148, height: 69 }}
+                    resizeMode="contain"
+                  />
+                </View>
+              )}
               {!compact && (
                 <TouchableOpacity onPress={toggleTheme} style={{ padding: 4, borderRadius: 8 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   {isDark

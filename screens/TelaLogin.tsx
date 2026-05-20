@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  View, TextInput, TouchableOpacity,
+  View, TextInput, TouchableOpacity, Image,
   SafeAreaView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { T as Text } from '../components/T';
@@ -50,11 +50,12 @@ export function TelaLogin() {
 
           {/* ── Painel esquerdo — branding ── */}
           <View style={{ flex: 1.1, backgroundColor: LP.bg, paddingHorizontal: 56, paddingVertical: 48, justifyContent: 'space-between' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: LP.accent, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 18 }}>💰</Text>
-              </View>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: LP.text }}>Meu Financeiro</Text>
+            <View>
+              <Image
+                source={require('../assets/logo.svg')}
+                style={{ width: 200, height: 93 }}
+                resizeMode="contain"
+              />
             </View>
 
             <View style={{ flex: 1, justifyContent: 'center', paddingVertical: 32 }}>
@@ -165,12 +166,12 @@ export function TelaLogin() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.primaryDark }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <View style={{ paddingTop: 52, paddingBottom: 44, paddingHorizontal: 28, alignItems: 'center' }}>
-          <View style={{ width: 64, height: 64, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-            <Text style={{ fontSize: 30 }}>💰</Text>
-          </View>
-          <Text style={{ fontSize: 24, fontWeight: '700', color: '#fff', letterSpacing: -0.5, marginBottom: 6 }}>Meu Financeiro</Text>
-          <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', textAlign: 'center' }}>Controle suas finanças com facilidade</Text>
+        <View style={{ paddingTop: 48, paddingBottom: 36, paddingHorizontal: 28, alignItems: 'center' }}>
+          <Image
+            source={require('../assets/logo-dark.svg')}
+            style={{ width: 220, height: 103 }}
+            resizeMode="contain"
+          />
         </View>
         <View style={{ flex: 1, backgroundColor: C.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 28 }}>
           <Text style={{ fontSize: 22, fontWeight: '700', color: C.text, letterSpacing: -0.4, marginBottom: 4 }}>
