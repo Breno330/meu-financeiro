@@ -12,7 +12,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { Home, BarChart2, Target, Download, LogOut, Sun, Moon } from 'lucide-react-native';
 
-import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { ThemeProvider, useTheme, type ColorPalette } from './contexts/ThemeContext';
 import { useToast } from './hooks/useToast';
 import { useBreakpoint } from './hooks/useBreakpoint';
 import { T } from './components/T';
@@ -327,7 +327,7 @@ function AppInner() {
 
 // ── Estilos ──────────────────────────────────────────────────────────────────
 
-function makeStyles(C: ReturnType<typeof useTheme>['C']) {
+function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: C.bg },
 

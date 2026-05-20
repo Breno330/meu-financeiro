@@ -41,21 +41,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    AsyncStorage.getItem('theme').then(v => {
-      if (v === 'dark') setIsDark(true);
-    });
+    AsyncStorage.getItem('theme')
+      .then(v => { if (v === 'dark') setIsDark(true); })
+      .catch(() => {}); // silencioso caso localStorage esteja bloqueado
   }, []);
 
   function toggleTheme() {
     setIsDark(prev => {
       const next = !prev;
-      AsyncStorage.setItem('theme', next ? 'dark' : 'light');
+      AsyncStorage.setItem('theme', next ? 'dark' : 'light').catch(() => {});
       return next;
     });
   }
 
-  const value = useMemo<ThemeCtx>(
-    () => ({ isDark, toggleTheme, C: isDark ? DARK : LIGHT }),
+  const value = useMemo(
+    () => ({ isDark, toggleTheme, C: isDark ? DARK : LIGHT }) as ThemeCtx,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [isDark],
   );
