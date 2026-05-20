@@ -3,6 +3,11 @@ import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { T as Text } from '../components/T';
 import { HeroCard } from '../components/HeroCard';
 import { MESES, CORES_CAT } from '../constants';
+import {
+  ArrowUpRight, ArrowDownRight, Wallet, Calendar,
+  TrendingUp, TrendingDown, BarChart2, Lightbulb,
+  Tag, AlertTriangle, CheckCircle,
+} from 'lucide-react-native';
 import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, fmtSaldo } from '../utils/format';
 import { GraficoPizza } from '../components/GraficoPizza';
@@ -68,24 +73,26 @@ export function TelaResumo({ transacoes, metas }: Props) {
     const pctDespTotal = totalRecDesp > 0 ? Math.round(despesasMes / totalRecDesp * 100) : 0;
     const gastouPctAMais = receitasMes > 0 ? Math.round((despesasMes - receitasMes) / receitasMes * 100) : null;
 
-    const insights: string[] = [];
+    type InsightType = 'up' | 'down' | 'tag' | 'warn' | 'ok';
+    const insightsRaw: { tipo: InsightType; texto: string }[] = [];
     if (pctDespSel !== null && Math.abs(pctDespSel) > 5)
-      insights.push(pctDespSel > 0
-        ? `📈 Despesas aumentaram ${Math.round(pctDespSel)}% vs ${MESES[mesSeldAnt]}.`
-        : `📉 Despesas caíram ${Math.abs(Math.round(pctDespSel))}% vs ${MESES[mesSeldAnt]}. Ótimo!`);
+      insightsRaw.push(pctDespSel > 0
+        ? { tipo: 'up',  texto: `Despesas aumentaram ${Math.round(pctDespSel)}% vs ${MESES[mesSeldAnt]}.` }
+        : { tipo: 'down', texto: `Despesas caíram ${Math.abs(Math.round(pctDespSel))}% vs ${MESES[mesSeldAnt]}. Ótimo!` });
     if (cats.length > 0 && despesasMes > 0)
-      insights.push(`🏷 ${cats[0][0]} foi sua maior despesa (${Math.round(cats[0][1] / despesasMes * 100)}% do total).`);
+      insightsRaw.push({ tipo: 'tag', texto: `${cats[0][0]} foi sua maior despesa (${Math.round(cats[0][1] / despesasMes * 100)}% do total).` });
     if (saldoMes < 0)
-      insights.push(`⚠️ Você gastou ${fmt(Math.abs(saldoMes))} a mais do que recebeu.`);
+      insightsRaw.push({ tipo: 'warn', texto: `Você gastou ${fmt(Math.abs(saldoMes))} a mais do que recebeu.` });
     else if (saldoMes > 0 && receitasMes > 0)
-      insights.push(`✅ Você economizou ${fmt(saldoMes)} (${Math.round(saldoMes / receitasMes * 100)}% da receita).`);
+      insightsRaw.push({ tipo: 'ok', texto: `Você economizou ${fmt(saldoMes)} (${Math.round(saldoMes / receitasMes * 100)}% da receita).` });
+    const insights = insightsRaw.slice(0, 3);
 
     return {
       receitasMes, despesasMes, saldoMes, cats, saldoAtual,
       mesSeldAnt, pctRecSel, pctDespSel,
       tendencia, tendMax, diasNoMes, mediaDiaria,
       pctRecTotal, pctDespTotal, gastouPctAMais,
-      insights: insights.slice(0, 3),
+      insights,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transacoes, metas, mesSel, anoSel]);
@@ -120,7 +127,10 @@ export function TelaResumo({ transacoes, metas }: Props) {
           <TouchableOpacity onPress={() => navMes(-1)}>
             <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>‹</Text>
           </TouchableOpacity>
-          <Text style={{ fontSize: 13, fontWeight: '600', color: C.text }}>📅 {MESES[mesSel].substring(0, 3)} {anoSel}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Calendar size={13} color={C.label} strokeWidth={2} />
+              <Text style={{ fontSize: 13, fontWeight: '600', color: C.text }}>{MESES[mesSel].substring(0, 3)} {anoSel}</Text>
+            </View>
           <TouchableOpacity onPress={() => navMes(1)}>
             <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>›</Text>
           </TouchableOpacity>
@@ -179,7 +189,9 @@ export function TelaResumo({ transacoes, metas }: Props) {
       {/* ── Linha 2: 4 cards de stats ── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, marginBottom: 12 }}>
         <View style={[s.statCard, { width: statCardWidth }]}>
-          <View style={[s.statIcone, { backgroundColor: C.receitaBg }]}><Text style={{ fontSize: 16 }}>📈</Text></View>
+          <View style={[s.statIcone, { backgroundColor: C.receitaBg }]}>
+            <ArrowUpRight size={16} color={C.receita} strokeWidth={2} />
+          </View>
           <Text style={s.statLabel}>Receitas</Text>
           <Text style={[s.statVal, { color: C.receita }]}>{fmt(receitasMes)}</Text>
           {pctRecSel !== null && (
@@ -189,7 +201,9 @@ export function TelaResumo({ transacoes, metas }: Props) {
           )}
         </View>
         <View style={[s.statCard, { width: statCardWidth }]}>
-          <View style={[s.statIcone, { backgroundColor: C.despesaBg }]}><Text style={{ fontSize: 16 }}>📉</Text></View>
+          <View style={[s.statIcone, { backgroundColor: C.despesaBg }]}>
+            <ArrowDownRight size={16} color={C.despesa} strokeWidth={2} />
+          </View>
           <Text style={s.statLabel}>Despesas</Text>
           <Text style={[s.statVal, { color: C.despesa }]}>{fmt(despesasMes)}</Text>
           {pctDespSel !== null && (
@@ -199,7 +213,12 @@ export function TelaResumo({ transacoes, metas }: Props) {
           )}
         </View>
         <View style={[s.statCard, { width: statCardWidth }]}>
-          <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}><Text style={{ fontSize: 16 }}>💰</Text></View>
+          <View style={[s.statIcone, { backgroundColor: saldoMes >= 0 ? C.receitaBg : C.despesaBg }]}>
+            {saldoMes >= 0
+              ? <TrendingUp size={16} color={C.receita} strokeWidth={2} />
+              : <TrendingDown size={16} color={C.despesa} strokeWidth={2} />
+            }
+          </View>
           <Text style={s.statLabel}>Diferença</Text>
           <Text style={[s.statVal, { color: saldoMes >= 0 ? C.receita : C.despesa }]}>{fmtSaldo(saldoMes)}</Text>
           <Text style={[s.statPct, { color: saldoMes >= 0 ? C.receita : C.despesa }]}>
@@ -207,7 +226,9 @@ export function TelaResumo({ transacoes, metas }: Props) {
           </Text>
         </View>
         <View style={[s.statCard, { width: statCardWidth }]}>
-          <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}><Text style={{ fontSize: 16 }}>📅</Text></View>
+          <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}>
+            <Calendar size={16} color={C.label} strokeWidth={1.8} />
+          </View>
           <Text style={s.statLabel}>Média diária</Text>
           <Text style={[s.statVal, { color: C.text }]}>{mediaDiaria > 0 ? fmt(mediaDiaria) : '—'}</Text>
           <Text style={s.statPct}>Baseado nos {diasNoMes} dias</Text>
@@ -276,7 +297,9 @@ export function TelaResumo({ transacoes, metas }: Props) {
             </>
           ) : (
             <View style={{ alignItems: 'center', paddingVertical: 24 }}>
-              <Text style={{ fontSize: 32, marginBottom: 8 }}>📊</Text>
+              <View style={{ width: 56, height: 56, borderRadius: 14, backgroundColor: C.bgAccent, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                <BarChart2 size={26} color={C.textLight} strokeWidth={1.5} />
+              </View>
               <Text style={{ fontSize: 13, color: C.textLight }}>Sem despesas em {MESES[mesSel]}</Text>
             </View>
           )}
@@ -286,14 +309,27 @@ export function TelaResumo({ transacoes, metas }: Props) {
       {/* ── Linha 4: Insights ── */}
       {insights.length > 0 && (
         <View style={{ marginHorizontal: 16, marginBottom: 12 }}>
-          <Text style={{ fontSize: 16, fontWeight: '600', color: C.text, marginBottom: 10 }}>💡 Insights para você</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+            <Lightbulb size={16} color={C.text} strokeWidth={2} />
+            <Text style={{ fontSize: 16, fontWeight: '600', color: C.text }}>Insights para você</Text>
+          </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             {insights.map((insight, i) => {
-              const isNeg = insight.includes('⚠️') || insight.includes('📈');
+              const isNeg = insight.tipo === 'warn' || insight.tipo === 'up';
+              const borderColor = isNeg ? C.despesa : C.receita;
+              const iconColor   = isNeg ? C.despesa : C.receita;
+              const IconComp =
+                insight.tipo === 'up'   ? TrendingUp :
+                insight.tipo === 'down' ? TrendingDown :
+                insight.tipo === 'tag'  ? Tag :
+                insight.tipo === 'warn' ? AlertTriangle :
+                CheckCircle;
               return (
-                <View key={i} style={{ flex: 1, backgroundColor: C.bgCard, borderRadius: 14, padding: 14, borderLeftWidth: 3, borderLeftColor: isNeg ? C.despesa : C.receita, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
-                  <Text style={{ fontSize: 20, marginBottom: 8 }}>{insight.substring(0, 2)}</Text>
-                  <Text style={{ fontSize: 12, color: C.text, lineHeight: 18, fontWeight: '500' }}>{insight.substring(2).trim()}</Text>
+                <View key={i} style={{ flex: 1, backgroundColor: C.bgCard, borderRadius: 14, padding: 14, borderLeftWidth: 3, borderLeftColor: borderColor, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+                  <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: isNeg ? C.despesaBg : C.receitaBg, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                    <IconComp size={16} color={iconColor} strokeWidth={2} />
+                  </View>
+                  <Text style={{ fontSize: 12, color: C.text, lineHeight: 18, fontWeight: '500' }}>{insight.texto}</Text>
                 </View>
               );
             })}

@@ -9,8 +9,13 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { supabase } from '../supabase';
-import { ArrowUpRight, ArrowDownRight, Tag, TrendingUp, TrendingDown, Pencil, X as XIcon } from 'lucide-react-native';
-import { CATEGORIAS, ICONES_CAT, MESES, CORES_CAT } from '../constants';
+import {
+  ArrowUpRight, ArrowDownRight, Tag, TrendingUp, TrendingDown,
+  Pencil, X as XIcon, Search, Share2, Wallet, FileText,
+  Table2, CheckCircle, AlertTriangle, Plus, Calendar,
+} from 'lucide-react-native';
+import { CATEGORIAS, MESES, CORES_CAT } from '../constants';
+import { CatIcon } from '../constants/catIcons';
 import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, fmtSaldo, saudacao, confirmar } from '../utils/format';
 import { useBreakpoint } from '../hooks/useBreakpoint';
@@ -230,7 +235,12 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
         onMouseLeave={isDesktop ? () => setHoveredId(null) : undefined}
       >
         <View style={[s.txIcone, { backgroundColor: t.tipo === 'receita' ? C.receitaBg : C.despesaBg }]}>
-          <Text style={{ fontSize: 16 }}>{ICONES_CAT[t.categoria]}</Text>
+          <CatIcon
+            categoria={t.categoria}
+            size={18}
+            color={t.tipo === 'receita' ? C.receita : C.despesa}
+            strokeWidth={1.8}
+          />
         </View>
         <View style={s.txInfo}>
           <Text style={s.txDesc}>{t.descricao}</Text>
@@ -260,7 +270,10 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={s.modalBox}>
               <View style={s.modalHandle}/>
-              <Text style={s.modalTitulo}>✏️ Editar lançamento</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Pencil size={16} color={C.primary} strokeWidth={2} />
+                <Text style={s.modalTitulo}>Editar lançamento</Text>
+              </View>
               <TextInput style={s.input} placeholder="Descrição" placeholderTextColor={C.textLight} value={editDesc} onChangeText={setEditDesc}/>
               <TextInput style={s.input} placeholder="Valor (ex: 2450,00)" placeholderTextColor={C.textLight} value={editVal} onChangeText={setEditVal} keyboardType="decimal-pad"/>
               <View style={s.row}>
@@ -274,7 +287,10 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[s.catScroll, { marginBottom: 12 }]}>
                 {CATEGORIAS.map(c => (
                   <TouchableOpacity key={c} style={[s.catBtn, editCat === c && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setEditCat(c)}>
-                    <Text style={[s.catBtnText, editCat === c && { color: '#fff' }]}>{ICONES_CAT[c]} {c}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <CatIcon categoria={c} size={12} color={editCat === c ? '#fff' : C.label} strokeWidth={2} />
+                      <Text style={[s.catBtnText, editCat === c && { color: '#fff' }]}>{c}</Text>
+                    </View>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -297,7 +313,10 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={s.modalBox}>
               <View style={s.modalHandle}/>
-              <Text style={s.modalTitulo}>➕ Novo lançamento</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Plus size={16} color={C.primary} strokeWidth={2} />
+                <Text style={s.modalTitulo}>Novo lançamento</Text>
+              </View>
               <TextInput style={s.input} placeholder="Descrição" placeholderTextColor={C.textLight} value={desc} onChangeText={setDesc}/>
               <TextInput style={s.input} placeholder="Valor (ex: 2450,00)" placeholderTextColor={C.textLight} value={val} onChangeText={setVal} keyboardType="decimal-pad"/>
               <View style={s.row}>
@@ -311,7 +330,10 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.catScroll}>
                 {CATEGORIAS.map(c => (
                   <TouchableOpacity key={c} style={[s.catBtn, cat === c && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setCat(c)}>
-                    <Text style={[s.catBtnText, cat === c && { color: '#fff' }]}>{ICONES_CAT[c]} {c}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <CatIcon categoria={c} size={12} color={cat === c ? '#fff' : C.label} strokeWidth={2} />
+                      <Text style={[s.catBtnText, cat === c && { color: '#fff' }]}>{c}</Text>
+                    </View>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -333,15 +355,22 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
         <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowExportMenu(false)}>
           <View style={[s.modalBox, { paddingBottom: 24 }]}>
             <View style={s.modalHandle}/>
-            <Text style={s.modalTitulo}>📤 Exportar relatório</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <Share2 size={16} color={C.primary} strokeWidth={2} />
+              <Text style={s.modalTitulo}>Exportar relatório</Text>
+            </View>
             <Text style={s.modalSub}>{MESES[filtroMes]} de {filtroAno}</Text>
             <TouchableOpacity style={[s.exportOpcao, { borderColor: C.receita }]} onPress={exportarCSV}>
-              <Text style={{ fontSize: 28, marginBottom: 4 }}>📊</Text>
+              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: C.receitaBg, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                <Table2 size={22} color={C.receita} strokeWidth={1.8} />
+              </View>
               <Text style={[s.exportOpcaoTitulo, { color: C.receita }]}>Planilha CSV</Text>
               <Text style={s.exportOpcaoSub}>Abrir no Excel ou Google Sheets</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.exportOpcao, { borderColor: C.despesa }]} onPress={exportarPDF}>
-              <Text style={{ fontSize: 28, marginBottom: 4 }}>📄</Text>
+              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: C.despesaBg, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                <FileText size={22} color={C.despesa} strokeWidth={1.8} />
+              </View>
               <Text style={[s.exportOpcaoTitulo, { color: C.despesa }]}>Relatório PDF</Text>
               <Text style={s.exportOpcaoSub}>Com resumo e tabela completa</Text>
             </TouchableOpacity>
@@ -354,7 +383,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
       {/* Header — sempre largura total */}
       <View style={s.pageHeader}>
         <View style={{ flex: 1 }}>
-          <Text style={s.greeting}>{saudacao()} 👋</Text>
+          <Text style={s.greeting}>{saudacao()}</Text>
           <Text style={s.pageTitle}>Minhas Finanças</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -437,7 +466,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
             {/* Busca + exportar */}
             <View style={s.buscaRow}>
               <View style={s.buscaInput}>
-                <Text style={{ fontSize: 14, color: C.textLight, marginRight: 6 }}>🔍</Text>
+                <Search size={14} color={C.textLight} strokeWidth={2} style={{ marginRight: 6 }} />
                 <TextInput
                   style={{ flex: 1, fontSize: 13, color: C.text }}
                   placeholder="Buscar transação..." placeholderTextColor={C.textLight}
@@ -450,7 +479,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
                 )}
               </View>
               <TouchableOpacity style={s.exportBtn} onPress={() => setShowExportMenu(true)}>
-                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>📤</Text>
+                <Share2 size={15} color="#fff" strokeWidth={2} />
               </TouchableOpacity>
             </View>
 
@@ -470,7 +499,9 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
               <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }}/>
             ) : visiveis.length === 0 ? (
               <View style={s.vazioContainer}>
-                <Text style={s.vazioEmoji}>💸</Text>
+                <View style={[s.vazioEmoji, { backgroundColor: C.bgAccent, borderRadius: 20 }]}>
+                <Wallet size={40} color={C.textLight} strokeWidth={1.5} />
+              </View>
                 <Text style={s.vazioTitulo}>{busca ? 'Nenhum resultado' : 'Nenhum lançamento'}</Text>
                 <Text style={s.vazioSub}>{busca ? `Nenhuma transação encontrada para "${busca}".` : `Clique em + para adicionar sua primeira transação de ${MESES[filtroMes]}.`}</Text>
               </View>
@@ -500,7 +531,10 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
                   return (
                     <View key={cat} style={{ marginBottom: 16 }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <Text style={{ fontSize: 13, color: C.text }}>{ICONES_CAT[cat]} {cat}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <CatIcon categoria={cat} size={13} color={CORES_CAT[cat] || C.label} strokeWidth={2} />
+                          <Text style={{ fontSize: 13, color: C.text }}>{cat}</Text>
+                        </View>
                         <Text style={{ fontSize: 12, fontWeight: '600', color: C.text }}>{fmt(val)}</Text>
                       </View>
                       <View style={{ height: 4, backgroundColor: C.bgAccent, borderRadius: 2, overflow: 'hidden' }}>
@@ -536,10 +570,23 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
                       return (
                         <View key={i} style={{ marginBottom: 16 }}>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                            <Text style={{ fontSize: 13, color: C.text, flex: 1 }}>
-                              {meta.tipo === 'saldo' ? '💰 Saldo mínimo' : `${ICONES_CAT[meta.categoria || '']} ${meta.categoria}`}
-                            </Text>
-                            <Text style={{ fontSize: 12, fontWeight: '700', color: ok ? C.receita : C.despesa }}>{ok ? '✓' : '!'}</Text>
+                            <View style={{ flex: 1 }}>
+                              {meta.tipo === 'saldo' ? (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                  <Wallet size={13} color={C.label} strokeWidth={1.8} />
+                                  <Text style={{ fontSize: 13, color: C.text }}>Saldo mínimo</Text>
+                                </View>
+                              ) : (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                  <CatIcon categoria={meta.categoria || ''} size={13} color={C.label} strokeWidth={1.8} />
+                                  <Text style={{ fontSize: 13, color: C.text }}>{meta.categoria}</Text>
+                                </View>
+                              )}
+                            </View>
+                            {ok
+                              ? <CheckCircle size={14} color={C.receita} strokeWidth={2} />
+                              : <AlertTriangle size={14} color={C.despesa} strokeWidth={2} />
+                            }
                           </View>
                           <View style={{ height: 4, backgroundColor: C.bgAccent, borderRadius: 2, overflow: 'hidden' }}>
                             <View style={{ height: 4, width: `${Math.round(pct * 100)}%` as any, backgroundColor: barColor, borderRadius: 2 }} />
@@ -617,7 +664,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
           {/* Busca + exportar */}
           <View style={s.buscaRow}>
             <View style={s.buscaInput}>
-              <Text style={{ fontSize: 14, color: C.textLight, marginRight: 6 }}>🔍</Text>
+              <Search size={14} color={C.textLight} strokeWidth={2} style={{ marginRight: 6 }} />
               <TextInput
                 style={{ flex: 1, fontSize: 13, color: C.text }}
                 placeholder="Buscar transação..." placeholderTextColor={C.textLight}
@@ -630,7 +677,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
               )}
             </View>
             <TouchableOpacity style={s.exportBtn} onPress={() => setShowExportMenu(true)}>
-              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>📤</Text>
+              <Share2 size={15} color="#fff" strokeWidth={2} />
             </TouchableOpacity>
           </View>
 
@@ -650,7 +697,9 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
             <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }}/>
           ) : visiveis.length === 0 ? (
             <View style={s.vazioContainer}>
-              <Text style={s.vazioEmoji}>💸</Text>
+              <View style={[s.vazioEmoji, { backgroundColor: C.bgAccent, borderRadius: 20 }]}>
+                <Wallet size={40} color={C.textLight} strokeWidth={1.5} />
+              </View>
               <Text style={s.vazioTitulo}>{busca ? 'Nenhum resultado' : 'Nenhum lançamento'}</Text>
               <Text style={s.vazioSub}>{busca ? `Nenhuma transação encontrada para "${busca}".` : `Toque em + para adicionar sua primeira transação de ${MESES[filtroMes]}.`}</Text>
             </View>
@@ -706,7 +755,7 @@ function makeStyles(C: ColorPalette) {
   txMeta: { fontSize: 12, color: C.label, marginTop: 2 },
   txValor: { fontSize: 14, fontWeight: '600' },
   vazioContainer: { alignItems: 'center', paddingHorizontal: 32, paddingVertical: 40 },
-  vazioEmoji: { fontSize: 48, marginBottom: 12 },
+  vazioEmoji: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   vazioTitulo: { fontSize: 16, fontWeight: '600', color: C.text, marginBottom: 6 },
   vazioSub: { fontSize: 14, color: C.textLight, textAlign: 'center', lineHeight: 22 },
   input: { borderWidth: 0.5, borderColor: C.border, borderRadius: 10, padding: 10, fontSize: 14, marginBottom: 8, color: C.text, backgroundColor: C.bg },
