@@ -490,65 +490,74 @@ export default function App() {
 
   async function carregarTudo() {
     setCarregando(true);
-    const [r1, r2, r3] = await Promise.all([
-      supabase.from('transacoes').select('*').order('criado_em', { ascending: false }),
-      supabase.from('metas').select('*'),
-      supabase.from('recorrentes').select('*').eq('ativo', true),
-    ]);
+    try {
+      const [r1, r2, r3] = await Promise.all([
+        supabase.from('transacoes').select('*').order('criado_em', { ascending: false }),
+        supabase.from('metas').select('*'),
+        supabase.from('recorrentes').select('*').eq('ativo', true),
+      ]);
 
-    let todasTx: Transacao[] = r1.data || [];
-    const todasMetas = r2.data || [];
-    const todasRec = r3.data || [];
+      if (r1.error) throw new Error(`Transações: ${r1.error.message}`);
+      if (r2.error) throw new Error(`Metas: ${r2.error.message}`);
+      if (r3.error) throw new Error(`Recorrentes: ${r3.error.message}`);
 
-    setMetas(todasMetas);
-    setRecorrentes(todasRec);
+      let todasTx: Transacao[] = r1.data || [];
+      const todasMetas = r2.data || [];
+      const todasRec = r3.data || [];
 
-    // Auto-lança recorrentes se nenhuma delas já existir no mês atual
-    if (todasRec.length > 0) {
-      const mesStr = String(hoje.getMonth() + 1).padStart(2, '0');
-      const anoStr = String(hoje.getFullYear());
-      // Dedup: considera descrição base (antes do " (X/Y)") para evitar falsos negativos
-      const txMesDesc = todasTx
-        .filter(t => { const p = t.data?.split('/'); return p && p[1] === mesStr && p[2] === anoStr; })
-        .map(t => t.descricao.toLowerCase().trim().replace(/\s*\(\d+\/\d+\)$/, ''));
-      const descMesSet = new Set(txMesDesc);
-      const paraInserir = todasRec.filter(r => !descMesSet.has(r.descricao.toLowerCase().trim()));
+      setMetas(todasMetas);
+      setRecorrentes(todasRec);
 
-      if (paraInserir.length > 0) {
-        const novasTx: Transacao[] = [];
-        for (const r of paraInserir) {
-          // Monta descrição com número da parcela se for parcelado
-          let descricao = r.descricao;
-          if (r.parcelas_total && r.parcelas_restantes) {
-            const atual = r.parcelas_total - r.parcelas_restantes + 1;
-            descricao = `${r.descricao} (${atual}/${r.parcelas_total})`;
-          }
-          const { data: ins } = await supabase.from('transacoes').insert({
-            descricao, valor: r.valor, tipo: r.tipo,
-            categoria: r.categoria, data: `01/${mesStr}/${anoStr}`,
-          }).select();
-          if (ins?.[0]) novasTx.push(ins[0]);
+      // Auto-lança recorrentes se nenhuma delas já existir no mês atual
+      if (todasRec.length > 0) {
+        const mesStr = String(hoje.getMonth() + 1).padStart(2, '0');
+        const anoStr = String(hoje.getFullYear());
+        const txMesDesc = todasTx
+          .filter(t => { const p = t.data?.split('/'); return p && p[1] === mesStr && p[2] === anoStr; })
+          .map(t => t.descricao.toLowerCase().trim().replace(/\s*\(\d+\/\d+\)$/, ''));
+        const descMesSet = new Set(txMesDesc);
+        const paraInserir = todasRec.filter(r => !descMesSet.has(r.descricao.toLowerCase().trim()));
 
-          // Atualiza parcelas restantes
-          if (r.parcelas_restantes != null) {
-            const restantes = r.parcelas_restantes - 1;
-            if (restantes <= 0) {
-              await supabase.from('recorrentes').update({ ativo: false }).eq('id', r.id);
-            } else {
-              await supabase.from('recorrentes').update({ parcelas_restantes: restantes }).eq('id', r.id);
+        if (paraInserir.length > 0) {
+          const novasTx: Transacao[] = [];
+          for (const r of paraInserir) {
+            let descricao = r.descricao;
+            if (r.parcelas_total && r.parcelas_restantes) {
+              const atual = r.parcelas_total - r.parcelas_restantes + 1;
+              descricao = `${r.descricao} (${atual}/${r.parcelas_total})`;
+            }
+            const { data: ins, error: errIns } = await supabase.from('transacoes').insert({
+              descricao, valor: r.valor, tipo: r.tipo,
+              categoria: r.categoria, data: `01/${mesStr}/${anoStr}`,
+            }).select();
+            if (errIns) { console.error('Erro ao inserir recorrente:', errIns.message); continue; }
+            if (ins?.[0]) novasTx.push(ins[0]);
+
+            if (r.parcelas_restantes != null) {
+              const restantes = r.parcelas_restantes - 1;
+              if (restantes <= 0) {
+                await supabase.from('recorrentes').update({ ativo: false }).eq('id', r.id);
+              } else {
+                await supabase.from('recorrentes').update({ parcelas_restantes: restantes }).eq('id', r.id);
+              }
             }
           }
-        }
-        if (novasTx.length > 0) {
-          todasTx = [...novasTx, ...todasTx];
-          mostrarToast(`🔄 ${novasTx.length} recorrente${novasTx.length > 1 ? 's lançadas' : ' lançada'} automaticamente`);
+          if (novasTx.length > 0) {
+            todasTx = [...novasTx, ...todasTx];
+            mostrarToast(`🔄 ${novasTx.length} recorrente${novasTx.length > 1 ? 's lançadas' : ' lançada'} automaticamente`);
+          }
         }
       }
-    }
 
-    setTransacoes(todasTx);
-    calcularAlertas(todasTx, todasMetas);
-    setCarregando(false);
+      setTransacoes(todasTx);
+      calcularAlertas(todasTx, todasMetas);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido';
+      mostrarToast(`❌ Erro ao carregar dados: ${msg}`);
+      console.error('carregarTudo:', err);
+    } finally {
+      setCarregando(false);
+    }
   }
 
   function calcularAlertas(txs: Transacao[], mts: Meta[]) {
@@ -569,25 +578,34 @@ export default function App() {
 
   async function adicionar() {
     const v = parseFloat(val.replace(/\./g,'').replace(',','.'));
-    if (!desc || isNaN(v) || v <= 0) return;
+    if (!desc.trim() || isNaN(v) || v <= 0) {
+      mostrarToast('⚠️ Preencha descrição e valor corretamente.');
+      return;
+    }
     setSalvando(true);
-    const { data, error } = await supabase.from('transacoes').insert({ descricao: desc, valor: v, tipo, categoria: cat, data: hoje.toLocaleDateString('pt-BR') }).select();
-    if (data) {
+    try {
+      const { data, error } = await supabase.from('transacoes').insert({
+        descricao: desc.trim(), valor: v, tipo, categoria: cat,
+        data: hoje.toLocaleDateString('pt-BR'),
+      }).select();
+      if (error) throw error;
       const novas = [data[0], ...transacoes];
       setTransacoes(novas);
-      setDesc('');
-      setVal('');
+      setDesc(''); setVal('');
       calcularAlertas(novas, metas);
       setShowFormModal(false);
       mostrarToast('✅ Lançamento adicionado!');
+    } catch (err: any) {
+      mostrarToast(`❌ Erro ao salvar: ${err.message ?? 'tente novamente'}`);
+    } finally {
+      setSalvando(false);
     }
-    if (error) Alert.alert('Erro ao salvar', error.message);
-    setSalvando(false);
   }
 
   async function remover(id: string) {
     confirmar('Excluir lançamento', 'Tem certeza que deseja excluir este lançamento?', async () => {
-      await supabase.from('transacoes').delete().eq('id', id);
+      const { error } = await supabase.from('transacoes').delete().eq('id', id);
+      if (error) { mostrarToast(`❌ Erro ao excluir: ${error.message}`); return; }
       const novas = transacoes.filter(t => t.id !== id);
       setTransacoes(novas);
       calcularAlertas(novas, metas);
@@ -606,61 +624,95 @@ export default function App() {
   async function salvarEdicao() {
     if (!txEditando) return;
     const v = parseFloat(editVal.replace(/\./g,'').replace(',','.'));
-    if (!editDesc.trim() || isNaN(v) || v <= 0) { Alert.alert('Dados inválidos', 'Preencha descrição e valor corretamente.'); return; }
+    if (!editDesc.trim() || isNaN(v) || v <= 0) {
+      mostrarToast('⚠️ Preencha descrição e valor corretamente.');
+      return;
+    }
     setSalvandoEdit(true);
-    const { data, error } = await supabase.from('transacoes').update({ descricao: editDesc.trim(), valor: v, tipo: editTipo, categoria: editCat }).eq('id', txEditando.id).select();
-    if (error) { Alert.alert('Erro ao editar', error.message); }
-    else if (data) {
+    try {
+      const { data, error } = await supabase.from('transacoes')
+        .update({ descricao: editDesc.trim(), valor: v, tipo: editTipo, categoria: editCat })
+        .eq('id', txEditando.id).select();
+      if (error) throw error;
       const novas = transacoes.map(t => t.id === txEditando.id ? data[0] : t);
-      setTransacoes(novas); calcularAlertas(novas, metas);
+      setTransacoes(novas);
+      calcularAlertas(novas, metas);
       setTxEditando(null);
       mostrarToast('✏️ Lançamento atualizado!');
+    } catch (err: any) {
+      mostrarToast(`❌ Erro ao editar: ${err.message ?? 'tente novamente'}`);
+    } finally {
+      setSalvandoEdit(false);
     }
-    setSalvandoEdit(false);
   }
 
   async function adicionarMeta() {
     const v = parseFloat(metaVal.replace(/\./g,'').replace(',','.'));
-    if (isNaN(v) || v <= 0) return;
+    if (isNaN(v) || v <= 0) {
+      mostrarToast('⚠️ Informe um valor válido para a meta.');
+      return;
+    }
     setSalvandoMeta(true);
-    const { data } = await supabase.from('metas').insert({ tipo: metaTipo, categoria: metaTipo === 'categoria' ? metaCat : null, valor: v, mes: hoje.getMonth(), ano: hoje.getFullYear() }).select();
-    if (data) { const novas = [...metas, data[0]]; setMetas(novas); setMetaVal(''); calcularAlertas(transacoes, novas); mostrarToast('🎯 Meta salva!'); }
-    setSalvandoMeta(false);
+    try {
+      const { data, error } = await supabase.from('metas').insert({
+        tipo: metaTipo, categoria: metaTipo === 'categoria' ? metaCat : null,
+        valor: v, mes: hoje.getMonth(), ano: hoje.getFullYear(),
+      }).select();
+      if (error) throw error;
+      const novas = [...metas, data[0]];
+      setMetas(novas); setMetaVal('');
+      calcularAlertas(transacoes, novas);
+      mostrarToast('🎯 Meta salva!');
+    } catch (err: any) {
+      mostrarToast(`❌ Erro ao salvar meta: ${err.message ?? 'tente novamente'}`);
+    } finally {
+      setSalvandoMeta(false);
+    }
   }
 
   async function removerMeta(id: string) {
     confirmar('Excluir meta', 'Deseja remover esta meta?', async () => {
-      await supabase.from('metas').delete().eq('id', id);
+      const { error } = await supabase.from('metas').delete().eq('id', id);
+      if (error) { mostrarToast(`❌ Erro ao remover meta: ${error.message}`); return; }
       const novas = metas.filter(m => m.id !== id);
       setMetas(novas);
       calcularAlertas(transacoes, novas);
+      mostrarToast('🗑 Meta removida');
     });
   }
 
   async function adicionarRecorrente() {
     const v = parseFloat(recVal.replace(/\./g,'').replace(',','.'));
-    if (!recDesc || isNaN(v) || v <= 0) return;
+    if (!recDesc.trim() || isNaN(v) || v <= 0) {
+      mostrarToast('⚠️ Preencha descrição e valor corretamente.');
+      return;
+    }
     const parcTotal = recEhParcelado ? parseInt(recParcelas) : null;
     if (recEhParcelado && (!parcTotal || parcTotal < 2)) {
-      Alert.alert('Parcelas inválidas', 'Informe ao menos 2 parcelas.');
+      mostrarToast('⚠️ Informe ao menos 2 parcelas.');
       return;
     }
     setSalvandoRec(true);
-    const { data } = await supabase.from('recorrentes').insert({
-      descricao: recDesc, valor: v, tipo: recTipo, categoria: recCat, ativo: true,
-      parcelas_total: parcTotal, parcelas_restantes: parcTotal,
-    }).select();
-    if (data) {
+    try {
+      const { data, error } = await supabase.from('recorrentes').insert({
+        descricao: recDesc.trim(), valor: v, tipo: recTipo, categoria: recCat, ativo: true,
+        parcelas_total: parcTotal, parcelas_restantes: parcTotal,
+      }).select();
+      if (error) throw error;
       setRecorrentes([...recorrentes, data[0]]);
       setRecDesc(''); setRecVal(''); setRecParcelas(''); setRecEhParcelado(false);
       mostrarToast('🔄 Recorrente adicionada!');
+    } catch (err: any) {
+      mostrarToast(`❌ Erro ao salvar recorrente: ${err.message ?? 'tente novamente'}`);
+    } finally {
+      setSalvandoRec(false);
     }
-    setSalvandoRec(false);
   }
 
   async function removerRecorrente(id: string) {
     confirmar('Remover recorrente', 'Deseja remover esta despesa recorrente?', async () => {
-      await supabase.from('recorrentes').update({ ativo: false }).eq('id', id);
+      const { error } = await supabase.from('recorrentes').update({ ativo: false }).eq('id', id);
+      if (error) { mostrarToast(`❌ Erro ao remover: ${error.message}`); return; }
       setRecorrentes(recorrentes.filter(r => r.id !== id));
       mostrarToast('🗑 Recorrente removida');
     });
@@ -670,19 +722,22 @@ export default function App() {
     const sel = txOFX.filter(t => t.selecionada);
     if (!sel.length) return;
     setSalvandoOFX(true);
-    const { data, error } = await supabase.from('transacoes').insert(sel.map(({ id, selecionada, ...r }) => r)).select();
-    if (error) {
-      Alert.alert('Erro ao salvar', error.message);
-    } else if (data && data.length > 0) {
-      const novas = [...data, ...transacoes];
+    try {
+      const { data, error } = await supabase.from('transacoes')
+        .insert(sel.map(({ id: _id, selecionada: _sel, ...r }) => r))
+        .select();
+      if (error) throw error;
+      const novas = [...(data ?? []), ...transacoes];
       setTransacoes(novas);
-      setTxOFX([]);
-      setArquivoNome('');
+      setTxOFX([]); setArquivoNome('');
       setAba('lancamentos');
       calcularAlertas(novas, metas);
-      mostrarToast(`✅ ${data.length} transações importadas!`);
+      mostrarToast(`✅ ${data?.length ?? 0} transações importadas!`);
+    } catch (err: any) {
+      mostrarToast(`❌ Erro ao importar: ${err.message ?? 'tente novamente'}`);
+    } finally {
+      setSalvandoOFX(false);
     }
-    setSalvandoOFX(false);
   }
 
   async function exportarCSV() {
