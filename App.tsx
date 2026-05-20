@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, Modal, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { supabase } from './supabase';
 import type { Session } from '@supabase/supabase-js';
+import type { Tipo, Aba, Transacao, Meta, Recorrente, TransacaoOFX } from './types';
+import { useToast } from './hooks/useToast';
 import Svg, { Path } from 'react-native-svg';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -12,12 +14,7 @@ import * as Print from 'expo-print';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type Tipo = 'receita' | 'despesa';
-type Aba = 'lancamentos' | 'resumo' | 'metas' | 'importar';
-type Transacao = { id: string; descricao: string; valor: number; tipo: Tipo; categoria: string; data: string; criado_em?: string; };
-type Meta = { id: string; tipo: 'saldo' | 'categoria'; categoria?: string; valor: number; mes: number; ano: number; };
-type Recorrente = { id: string; descricao: string; valor: number; tipo: Tipo; categoria: string; ativo: boolean; parcelas_total?: number | null; parcelas_restantes?: number | null; };
-type TransacaoOFX = { id: string; descricao: string; valor: number; tipo: Tipo; categoria: string; data: string; selecionada: boolean; };
+// Types are imported from ./types
 
 const CATEGORIAS = ['Alimentação','Transporte','Moradia','Saúde','Lazer','Educação','Salário','Outros'];
 const CORES_CAT: Record<string,string> = {
@@ -424,13 +421,11 @@ export default function App() {
   // UX improvements
   const [showFormModal, setShowFormModal] = useState(false);
   const [limpandoDupl, setLimpandoDupl] = useState(false);
-  const [toastMsg, setToastMsg] = useState('');
-  const [toastVisible, setToastVisible] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [instrucaoExpandida, setInstrucaoExpandida] = useState(false);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { toastMsg, toastVisible, mostrarToast } = useToast();
 
-  async function limparDuplicatas() {
+  const limparDuplicatas = useCallback(async () => {
     setLimpandoDupl(true);
     const mesStr = String(hoje.getMonth() + 1).padStart(2, '0');
     const anoStr = String(hoje.getFullYear());
@@ -471,14 +466,7 @@ export default function App() {
         setLimpandoDupl(false);
       }
     );
-  }
-
-  function mostrarToast(msg: string) {
-    setToastMsg(msg);
-    setToastVisible(true);
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToastVisible(false), 2500);
-  }
+  }, [transacoes, metas, recorrentes, hoje, mostrarToast]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); setAuthCarregando(false); });
@@ -825,57 +813,131 @@ export default function App() {
     }
   }
 
-  function txDoMes(m: number, a: number) { return transacoes.filter(t => { const p = t.data?.split('/'); return p && parseInt(p[1])-1 === m && parseInt(p[2]) === a; }); }
+  const txDoMes = useCallback((m: number, a: number) => {
+    return transacoes.filter(t => { const p = t.data?.split('/'); return p && parseInt(p[1])-1 === m && parseInt(p[2]) === a; });
+  }, [transacoes]);
 
-  // Resumo tab
-  const txMes = txDoMes(mesSel, anoSel);
-  const receitasMes = txMes.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
-  const despesasMes = txMes.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
-  const saldoMes = receitasMes - despesasMes;
-  const catMap: Record<string,number> = {};
-  txMes.filter(t => t.tipo === 'despesa').forEach(t => { catMap[t.categoria] = (catMap[t.categoria]||0)+Number(t.valor); });
-  const cats = Object.entries(catMap).sort((a,b) => b[1]-a[1]);
-  const maxCat = cats.length > 0 ? cats[0][1] : 1;
+  // ── Derivações da aba Lançamentos ──────────────────────────────────────────
+  const lancamentosData = useMemo(() => {
+    const txFiltroMes = txDoMes(filtroMes, filtroAno);
+    const recFiltroMes = txFiltroMes.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
+    const despFiltroMes = txFiltroMes.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
+    const saldoFiltroMes = recFiltroMes - despFiltroMes;
 
-  // Mês atual (hero)
-  const txAtual = txDoMes(hoje.getMonth(), hoje.getFullYear());
-  const recAtual = txAtual.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
-  const despAtual = txAtual.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
-  const saldoAtual = recAtual - despAtual;
-  const metasMes = metas.filter(m => m.mes === hoje.getMonth() && m.ano === hoje.getFullYear());
+    const filtroMesAntIdx = filtroMes === 0 ? 11 : filtroMes - 1;
+    const filtroAnoAntIdx = filtroMes === 0 ? filtroAno - 1 : filtroAno;
+    const txMesAnt = txDoMes(filtroMesAntIdx, filtroAnoAntIdx);
+    const recMesAnt = txMesAnt.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
+    const despMesAnt = txMesAnt.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
+    const pctRec = recMesAnt > 0 ? ((recFiltroMes - recMesAnt) / recMesAnt * 100) : null;
+    const pctDesp = despMesAnt > 0 ? ((despFiltroMes - despMesAnt) / despMesAnt * 100) : null;
 
-  // Mês do filtro (lancamentos tab)
-  const txFiltroMes = txDoMes(filtroMes, filtroAno);
-  const recFiltroMes = txFiltroMes.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
-  const despFiltroMes = txFiltroMes.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
-  const saldoFiltroMes = recFiltroMes - despFiltroMes;
+    const catMapFiltro: Record<string,number> = {};
+    txFiltroMes.filter(t => t.tipo === 'despesa').forEach(t => { catMapFiltro[t.categoria] = (catMapFiltro[t.categoria]||0)+Number(t.valor); });
+    const catsFiltro = Object.entries(catMapFiltro).sort((a,b) => b[1]-a[1]);
+    const maiorCat = catsFiltro[0];
 
-  // Mês anterior para comparação %
-  const filtroMesAntIdx = filtroMes === 0 ? 11 : filtroMes - 1;
-  const filtroAnoAntIdx = filtroMes === 0 ? filtroAno - 1 : filtroAno;
-  const txMesAnt = txDoMes(filtroMesAntIdx, filtroAnoAntIdx);
-  const recMesAnt = txMesAnt.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
-  const despMesAnt = txMesAnt.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
-  const pctRec = recMesAnt > 0 ? ((recFiltroMes - recMesAnt) / recMesAnt * 100) : null;
-  const pctDesp = despMesAnt > 0 ? ((despFiltroMes - despMesAnt) / despMesAnt * 100) : null;
+    const visiveis = transacoes.filter(t => {
+      const p = t.data?.split('/');
+      const noMes = p && parseInt(p[1])-1 === filtroMes && parseInt(p[2]) === filtroAno;
+      const matchTipo = filtro === 'todas' || t.tipo === filtro;
+      const matchBusca = !busca || t.descricao.toLowerCase().includes(busca.toLowerCase()) || t.categoria.toLowerCase().includes(busca.toLowerCase());
+      return noMes && matchTipo && matchBusca;
+    });
 
-  // Maior categoria do filtro
-  const catMapFiltro: Record<string,number> = {};
-  txFiltroMes.filter(t => t.tipo === 'despesa').forEach(t => { catMapFiltro[t.categoria] = (catMapFiltro[t.categoria]||0)+Number(t.valor); });
-  const catsFiltro = Object.entries(catMapFiltro).sort((a,b) => b[1]-a[1]);
-  const maiorCat = catsFiltro[0];
+    const txAgrupadas = visiveis.reduce((acc, t) => { if (!acc[t.data]) acc[t.data] = []; acc[t.data].push(t); return acc; }, {} as Record<string, Transacao[]>);
+    const datasOrdenadas = Object.keys(txAgrupadas).sort((a, b) => {
+      const [da,ma,ya] = a.split('/').map(Number);
+      const [db,mb,yb] = b.split('/').map(Number);
+      return new Date(yb,mb-1,db).getTime() - new Date(ya,ma-1,da).getTime();
+    });
 
-  // Transações visíveis com busca
-  const visiveis = transacoes.filter(t => {
-    const p = t.data?.split('/');
-    const noMes = p && parseInt(p[1])-1 === filtroMes && parseInt(p[2]) === filtroAno;
-    const matchTipo = filtro === 'todas' || t.tipo === filtro;
-    const matchBusca = !busca || t.descricao.toLowerCase().includes(busca.toLowerCase()) || t.categoria.toLowerCase().includes(busca.toLowerCase());
-    return noMes && matchTipo && matchBusca;
-  });
+    return { txFiltroMes, recFiltroMes, despFiltroMes, saldoFiltroMes, filtroMesAntIdx, filtroAnoAntIdx, pctRec, pctDesp, maiorCat, visiveis, txAgrupadas, datasOrdenadas };
+  }, [transacoes, filtroMes, filtroAno, filtro, busca, txDoMes]);
 
-  // Agrupamento por data
-  function formatarDataGrupo(dataStr: string): string {
+  const { txFiltroMes, recFiltroMes, despFiltroMes, saldoFiltroMes,
+          filtroMesAntIdx, pctRec, pctDesp, maiorCat,
+          visiveis, txAgrupadas, datasOrdenadas } = lancamentosData;
+
+  // ── Derivações das abas Resumo + Metas ────────────────────────────────────
+  const resumoData = useMemo(() => {
+    const txMes = txDoMes(mesSel, anoSel);
+    const receitasMes = txMes.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
+    const despesasMes = txMes.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
+    const saldoMes = receitasMes - despesasMes;
+
+    const catMap: Record<string,number> = {};
+    txMes.filter(t => t.tipo === 'despesa').forEach(t => { catMap[t.categoria] = (catMap[t.categoria]||0)+Number(t.valor); });
+    const cats = Object.entries(catMap).sort((a,b) => b[1]-a[1]);
+
+    const txAtual = txDoMes(hoje.getMonth(), hoje.getFullYear());
+    const recAtual = txAtual.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
+    const despAtual = txAtual.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
+    const saldoAtual = recAtual - despAtual;
+    const metasMes = metas.filter(m => m.mes === hoje.getMonth() && m.ano === hoje.getFullYear());
+
+    const mesSeldAnt = mesSel === 0 ? 11 : mesSel - 1;
+    const anoSelAnt  = mesSel === 0 ? anoSel - 1 : anoSel;
+    const txMesSelAnt   = txDoMes(mesSeldAnt, anoSelAnt);
+    const recMesSelAnt  = txMesSelAnt.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
+    const despMesSelAnt = txMesSelAnt.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
+    const pctRecSel  = recMesSelAnt  > 0 ? (receitasMes  - recMesSelAnt)  / recMesSelAnt  * 100 : null;
+    const pctDespSel = despMesSelAnt > 0 ? (despesasMes  - despMesSelAnt) / despMesSelAnt * 100 : null;
+
+    const tendencia = Array.from({ length: 4 }, (_, i) => {
+      let m = mesSel - (3 - i), a = anoSel;
+      while (m < 0) { m += 12; a--; }
+      const txM = txDoMes(m, a);
+      const rec  = txM.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
+      const desp = txM.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
+      return { label: MESES[m].substring(0, 3), rec, desp };
+    });
+    const tendMax = Math.max(...tendencia.map(t => Math.max(t.rec, t.desp)), 1);
+
+    const diasNoMes = new Date(anoSel, mesSel + 1, 0).getDate();
+    const mediaDiaria = despesasMes > 0 ? despesasMes / diasNoMes : 0;
+    const totalRecDesp = receitasMes + despesasMes;
+    const pctRecTotal  = totalRecDesp > 0 ? Math.round(receitasMes / totalRecDesp * 100) : 0;
+    const pctDespTotal = totalRecDesp > 0 ? Math.round(despesasMes / totalRecDesp * 100) : 0;
+    const gastouPctAMais = receitasMes > 0 ? Math.round((despesasMes - receitasMes) / receitasMes * 100) : null;
+
+    const insights: string[] = [];
+    if (pctDespSel !== null && Math.abs(pctDespSel) > 5)
+      insights.push(pctDespSel > 0
+        ? `📈 Despesas aumentaram ${Math.round(pctDespSel)}% vs ${MESES[mesSeldAnt]}.`
+        : `📉 Despesas caíram ${Math.abs(Math.round(pctDespSel))}% vs ${MESES[mesSeldAnt]}. Ótimo!`);
+    if (cats.length > 0 && despesasMes > 0)
+      insights.push(`🏷 ${cats[0][0]} foi sua maior despesa (${Math.round(cats[0][1] / despesasMes * 100)}% do total).`);
+    if (saldoMes < 0)
+      insights.push(`⚠️ Você gastou ${fmt(Math.abs(saldoMes))} a mais do que recebeu.`);
+    else if (saldoMes > 0 && receitasMes > 0)
+      insights.push(`✅ Você economizou ${fmt(saldoMes)} (${Math.round(saldoMes / receitasMes * 100)}% da receita).`);
+
+    return {
+      txMes, receitasMes, despesasMes, saldoMes, cats,
+      txAtual, saldoAtual, metasMes,
+      mesSeldAnt, pctRecSel, pctDespSel,
+      tendencia, tendMax, diasNoMes, mediaDiaria,
+      pctRecTotal, pctDespTotal, gastouPctAMais,
+      insights: insights.slice(0, 3),
+    };
+  }, [transacoes, metas, mesSel, anoSel, txDoMes]);
+
+  const { txMes: _txMes, receitasMes, despesasMes, saldoMes, cats,
+          txAtual, saldoAtual, metasMes,
+          mesSeldAnt, pctRecSel, pctDespSel,
+          tendencia, tendMax, diasNoMes, mediaDiaria,
+          pctRecTotal, pctDespTotal, gastouPctAMais, insights } = resumoData;
+
+  const selOFX = useMemo(() => txOFX.filter(t => t.selecionada).length, [txOFX]);
+
+  const getProgMeta = useCallback((m: Meta) => {
+    if (m.tipo === 'saldo') return { atual: saldoAtual, max: m.valor, pct: Math.min(Math.max(saldoAtual/m.valor*100,0),100), ok: saldoAtual >= m.valor };
+    const g = txAtual.filter(t => t.tipo === 'despesa' && t.categoria === m.categoria).reduce((s,t) => s+Number(t.valor), 0);
+    return { atual: g, max: m.valor, pct: Math.min(g/m.valor*100,100), ok: g <= m.valor };
+  }, [saldoAtual, txAtual]);
+
+  const formatarDataGrupo = useCallback((dataStr: string): string => {
     const hojeStr = hoje.toLocaleDateString('pt-BR');
     const ontem = new Date(hoje); ontem.setDate(hoje.getDate() - 1);
     const ontemStr = ontem.toLocaleDateString('pt-BR');
@@ -884,65 +946,7 @@ export default function App() {
     const p = dataStr.split('/');
     if (p.length === 3) return `${parseInt(p[0])} de ${MESES[parseInt(p[1])-1]}`;
     return dataStr;
-  }
-  const txAgrupadas = visiveis.reduce((acc, t) => { if (!acc[t.data]) acc[t.data] = []; acc[t.data].push(t); return acc; }, {} as Record<string, Transacao[]>);
-  const datasOrdenadas = Object.keys(txAgrupadas).sort((a, b) => {
-    const [da,ma,ya] = a.split('/').map(Number);
-    const [db,mb,yb] = b.split('/').map(Number);
-    return new Date(yb,mb-1,db).getTime() - new Date(ya,ma-1,da).getTime();
-  });
-
-  const selOFX = txOFX.filter(t => t.selecionada).length;
-
-  // Dados para aba Resumo
-  const mesSeldAnt = mesSel === 0 ? 11 : mesSel - 1;
-  const anoSelAnt  = mesSel === 0 ? anoSel - 1 : anoSel;
-  const txMesSelAnt   = txDoMes(mesSeldAnt, anoSelAnt);
-  const recMesSelAnt  = txMesSelAnt.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
-  const despMesSelAnt = txMesSelAnt.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
-  const pctRecSel  = recMesSelAnt  > 0 ? (receitasMes  - recMesSelAnt)  / recMesSelAnt  * 100 : null;
-  const pctDespSel = despMesSelAnt > 0 ? (despesasMes  - despMesSelAnt) / despMesSelAnt * 100 : null;
-
-  // Tendência histórica — 4 meses
-  const tendencia = Array.from({ length: 4 }, (_, i) => {
-    let m = mesSel - (3 - i), a = anoSel;
-    while (m < 0) { m += 12; a--; }
-    const txM = txDoMes(m, a);
-    const rec  = txM.filter(t => t.tipo === 'receita').reduce((s,t) => s+Number(t.valor), 0);
-    const desp = txM.filter(t => t.tipo === 'despesa').reduce((s,t) => s+Number(t.valor), 0);
-    return { label: MESES[m].substring(0, 3), rec, desp };
-  });
-  const tendMax = Math.max(...tendencia.map(t => Math.max(t.rec, t.desp)), 1);
-
-  // Média diária de despesas
-  const diasNoMes = new Date(anoSel, mesSel + 1, 0).getDate();
-  const mediaDiaria = despesasMes > 0 ? despesasMes / diasNoMes : 0;
-  const totalRecDesp = receitasMes + despesasMes;
-  const pctRecTotal  = totalRecDesp > 0 ? Math.round(receitasMes / totalRecDesp * 100) : 0;
-  const pctDespTotal = totalRecDesp > 0 ? Math.round(despesasMes / totalRecDesp * 100) : 0;
-  const gastouPctAMais = receitasMes > 0 ? Math.round((despesasMes - receitasMes) / receitasMes * 100) : null;
-
-  // Insights automáticos
-  const insights: string[] = (() => {
-    const r: string[] = [];
-    if (pctDespSel !== null && Math.abs(pctDespSel) > 5)
-      r.push(pctDespSel > 0
-        ? `📈 Despesas aumentaram ${Math.round(pctDespSel)}% vs ${MESES[mesSeldAnt]}.`
-        : `📉 Despesas caíram ${Math.abs(Math.round(pctDespSel))}% vs ${MESES[mesSeldAnt]}. Ótimo!`);
-    if (cats.length > 0 && despesasMes > 0)
-      r.push(`🏷 ${cats[0][0]} foi sua maior despesa (${Math.round(cats[0][1] / despesasMes * 100)}% do total).`);
-    if (saldoMes < 0)
-      r.push(`⚠️ Você gastou ${fmt(Math.abs(saldoMes))} a mais do que recebeu.`);
-    else if (saldoMes > 0 && receitasMes > 0)
-      r.push(`✅ Você economizou ${fmt(saldoMes)} (${Math.round(saldoMes / receitasMes * 100)}% da receita).`);
-    return r.slice(0, 3);
-  })();
-
-  function getProgMeta(m: Meta) {
-    if (m.tipo === 'saldo') return { atual: saldoAtual, max: m.valor, pct: Math.min(Math.max(saldoAtual/m.valor*100,0),100), ok: saldoAtual >= m.valor };
-    const g = txAtual.filter(t => t.tipo === 'despesa' && t.categoria === m.categoria).reduce((s,t) => s+Number(t.valor), 0);
-    return { atual: g, max: m.valor, pct: Math.min(g/m.valor*100,100), ok: g <= m.valor };
-  }
+  }, [hoje]);
 
   if (authCarregando) return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' }}>
