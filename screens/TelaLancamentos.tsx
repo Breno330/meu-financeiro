@@ -39,7 +39,7 @@ type Props = {
 
 export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAlertas, mostrarToast, carregando, mesSel, anoSel, navMes }: Props) {
   const hoje = new Date();
-  const { heroFontSize, statCardWidth, isDesktop, showRightPanel, rightPanelWidth } = useBreakpoint();
+  const { heroFontSize, statCardWidth, isMobile, isDesktop, showRightPanel, rightPanelWidth } = useBreakpoint();
   const { C } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
 
