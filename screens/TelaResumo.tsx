@@ -127,7 +127,8 @@ export function TelaResumo({ transacoes, metas, carregando, mesSel, anoSel, navM
       />
 
       {/* ── Linha 1: Hero + Receitas vs Despesas ── */}
-      <View style={{ flexDirection: 'row', gap: 12, marginHorizontal: 16, marginBottom: 12 }}>
+      {/* Mobile: coluna única — Desktop: lado a lado */}
+      <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 12, marginHorizontal: 16, marginBottom: 12 }}>
 
         {/* Hero — saldo */}
         <HeroCard
@@ -139,11 +140,11 @@ export function TelaResumo({ transacoes, metas, carregando, mesSel, anoSel, navM
           pctRec={pctRecSel}
           pctDesp={pctDespSel}
           mesPrevLabel={MESES[mesSeldAnt].substring(0, 3)}
-          style={{ flex: 1 }}
+          style={isMobile ? undefined : { flex: 1 }}
         />
 
         {/* Receitas vs Despesas */}
-        <View style={[s.section, { flex: 1.4 }]}>
+        <View style={[s.section, isMobile ? undefined : { flex: 1.4 }]}>
           <Text style={s.sectionTitulo}>Receitas vs Despesas</Text>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <View style={{ flex: 1, gap: 16 }}>
@@ -169,7 +170,7 @@ export function TelaResumo({ transacoes, metas, carregando, mesSel, anoSel, navM
                 <GraficoPizza
                   dados={[['Receitas', receitasMes], ['Despesas', despesasMes]]}
                   colors={[C.receita, C.despesa]}
-                  size={130}
+                  size={isMobile ? 110 : 130}
                   centerLabel={`${pctDespTotal}%`}
                   centerSub="Desp."
                 />
@@ -293,10 +294,10 @@ export function TelaResumo({ transacoes, metas, carregando, mesSel, anoSel, navM
       )}
 
       {/* ── Linha 3: Evolução + Categorias ── */}
-      <View style={{ flexDirection: 'row', gap: 12, marginHorizontal: 16, marginBottom: 12 }}>
+      <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 12, marginHorizontal: 16, marginBottom: 12 }}>
 
         {/* Evolução */}
-        <View style={[s.section, { flex: 1 }]}>
+        <View style={[s.section, isMobile ? undefined : { flex: 1 }]}>
           <Text style={s.sectionTitulo}>Evolução dos últimos 4 meses</Text>
 
           {tendencia.every(t => t.rec === 0 && t.desp === 0) ? (
@@ -354,7 +355,7 @@ export function TelaResumo({ transacoes, metas, carregando, mesSel, anoSel, navM
         </View>
 
         {/* Categorias */}
-        <View style={[s.section, { flex: 1 }]}>
+        <View style={[s.section, isMobile ? undefined : { flex: 1 }]}>
           <Text style={s.sectionTitulo}>Despesas por categoria</Text>
           {cats.length > 0 ? (
             <>
@@ -396,7 +397,7 @@ export function TelaResumo({ transacoes, metas, carregando, mesSel, anoSel, navM
             <Lightbulb size={16} color={C.text} strokeWidth={2} />
             <Text style={{ fontSize: 16, fontWeight: '600', color: C.text }}>Insights para você</Text>
           </View>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 10 }}>
             {insights.map((insight, i) => {
               const isNeg = insight.tipo === 'warn' || insight.tipo === 'up';
               const borderColor = isNeg ? C.despesa : C.receita;
