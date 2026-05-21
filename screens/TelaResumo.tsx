@@ -24,7 +24,7 @@ export function TelaResumo({ transacoes, metas }: Props) {
   const hoje = new Date();
   const [mesSel, setMesSel] = useState(hoje.getMonth());
   const [anoSel, setAnoSel] = useState(hoje.getFullYear());
-  const { heroFontSize, statCardWidth } = useBreakpoint();
+  const { heroFontSize, statCardWidth, isMobile } = useBreakpoint();
   const { C } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
 
@@ -186,53 +186,105 @@ export function TelaResumo({ transacoes, metas }: Props) {
       </View>
 
       {/* ── Linha 2: 4 cards de stats ── */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, marginBottom: 12 }}>
-        <View style={[s.statCard, { width: statCardWidth }]}>
-          <View style={[s.statIcone, { backgroundColor: C.receitaBg }]}>
-            <ArrowUpRight size={16} color={C.receita} strokeWidth={2} />
+      {isMobile ? (
+        /* Mobile: scroll horizontal com cards de largura fixa */
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+          <View style={[s.statCard, { width: statCardWidth }]}>
+            <View style={[s.statIcone, { backgroundColor: C.receitaBg }]}>
+              <ArrowUpRight size={16} color={C.receita} strokeWidth={2} />
+            </View>
+            <Text style={s.statLabel}>Receitas</Text>
+            <Text style={[s.statVal, { color: C.receita }]}>{fmt(receitasMes)}</Text>
+            {pctRecSel !== null && (
+              <Text style={[s.statPct, { color: pctRecSel >= 0 ? C.receita : C.despesa }]}>
+                {pctRecSel >= 0 ? '▲' : '▼'} {Math.abs(Math.round(pctRecSel))}% vs {MESES[mesSeldAnt].substring(0, 3)}
+              </Text>
+            )}
           </View>
-          <Text style={s.statLabel}>Receitas</Text>
-          <Text style={[s.statVal, { color: C.receita }]}>{fmt(receitasMes)}</Text>
-          {pctRecSel !== null && (
-            <Text style={[s.statPct, { color: pctRecSel >= 0 ? C.receita : C.despesa }]}>
-              {pctRecSel >= 0 ? '▲' : '▼'} {Math.abs(Math.round(pctRecSel))}% vs {MESES[mesSeldAnt].substring(0, 3)}
+          <View style={[s.statCard, { width: statCardWidth }]}>
+            <View style={[s.statIcone, { backgroundColor: C.despesaBg }]}>
+              <ArrowDownRight size={16} color={C.despesa} strokeWidth={2} />
+            </View>
+            <Text style={s.statLabel}>Despesas</Text>
+            <Text style={[s.statVal, { color: C.despesa }]}>{fmt(despesasMes)}</Text>
+            {pctDespSel !== null && (
+              <Text style={[s.statPct, { color: pctDespSel > 0 ? C.despesa : C.receita }]}>
+                {pctDespSel > 0 ? '▲' : '▼'} {Math.abs(Math.round(pctDespSel))}% vs {MESES[mesSeldAnt].substring(0, 3)}
+              </Text>
+            )}
+          </View>
+          <View style={[s.statCard, { width: statCardWidth }]}>
+            <View style={[s.statIcone, { backgroundColor: saldoMes >= 0 ? C.receitaBg : C.despesaBg }]}>
+              {saldoMes >= 0
+                ? <TrendingUp size={16} color={C.receita} strokeWidth={2} />
+                : <TrendingDown size={16} color={C.despesa} strokeWidth={2} />
+              }
+            </View>
+            <Text style={s.statLabel}>Diferença</Text>
+            <Text style={[s.statVal, { color: saldoMes >= 0 ? C.receita : C.despesa }]}>{fmtSaldo(saldoMes)}</Text>
+            <Text style={[s.statPct, { color: saldoMes >= 0 ? C.receita : C.despesa }]}>
+              {saldoMes >= 0 ? 'Superávit' : `Déficit de ${gastouPctAMais ?? 0}%`}
             </Text>
-          )}
-        </View>
-        <View style={[s.statCard, { width: statCardWidth }]}>
-          <View style={[s.statIcone, { backgroundColor: C.despesaBg }]}>
-            <ArrowDownRight size={16} color={C.despesa} strokeWidth={2} />
           </View>
-          <Text style={s.statLabel}>Despesas</Text>
-          <Text style={[s.statVal, { color: C.despesa }]}>{fmt(despesasMes)}</Text>
-          {pctDespSel !== null && (
-            <Text style={[s.statPct, { color: pctDespSel > 0 ? C.despesa : C.receita }]}>
-              {pctDespSel > 0 ? '▲' : '▼'} {Math.abs(Math.round(pctDespSel))}% vs {MESES[mesSeldAnt].substring(0, 3)}
+          <View style={[s.statCard, { width: statCardWidth }]}>
+            <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}>
+              <Calendar size={16} color={C.label} strokeWidth={1.8} />
+            </View>
+            <Text style={s.statLabel}>Média diária</Text>
+            <Text style={[s.statVal, { color: C.text }]}>{mediaDiaria > 0 ? fmt(mediaDiaria) : '—'}</Text>
+            <Text style={s.statPct}>Baseado nos {diasNoMes} dias</Text>
+          </View>
+        </ScrollView>
+      ) : (
+        /* Tablet / Desktop: grid de 4 colunas — flex:1 distribui o espaço */
+        <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 12 }}>
+          <View style={[s.statCard, { flex: 1 }]}>
+            <View style={[s.statIcone, { backgroundColor: C.receitaBg }]}>
+              <ArrowUpRight size={16} color={C.receita} strokeWidth={2} />
+            </View>
+            <Text style={s.statLabel}>Receitas</Text>
+            <Text style={[s.statVal, { color: C.receita }]}>{fmt(receitasMes)}</Text>
+            {pctRecSel !== null && (
+              <Text style={[s.statPct, { color: pctRecSel >= 0 ? C.receita : C.despesa }]}>
+                {pctRecSel >= 0 ? '▲' : '▼'} {Math.abs(Math.round(pctRecSel))}% vs {MESES[mesSeldAnt].substring(0, 3)}
+              </Text>
+            )}
+          </View>
+          <View style={[s.statCard, { flex: 1 }]}>
+            <View style={[s.statIcone, { backgroundColor: C.despesaBg }]}>
+              <ArrowDownRight size={16} color={C.despesa} strokeWidth={2} />
+            </View>
+            <Text style={s.statLabel}>Despesas</Text>
+            <Text style={[s.statVal, { color: C.despesa }]}>{fmt(despesasMes)}</Text>
+            {pctDespSel !== null && (
+              <Text style={[s.statPct, { color: pctDespSel > 0 ? C.despesa : C.receita }]}>
+                {pctDespSel > 0 ? '▲' : '▼'} {Math.abs(Math.round(pctDespSel))}% vs {MESES[mesSeldAnt].substring(0, 3)}
+              </Text>
+            )}
+          </View>
+          <View style={[s.statCard, { flex: 1 }]}>
+            <View style={[s.statIcone, { backgroundColor: saldoMes >= 0 ? C.receitaBg : C.despesaBg }]}>
+              {saldoMes >= 0
+                ? <TrendingUp size={16} color={C.receita} strokeWidth={2} />
+                : <TrendingDown size={16} color={C.despesa} strokeWidth={2} />
+              }
+            </View>
+            <Text style={s.statLabel}>Diferença</Text>
+            <Text style={[s.statVal, { color: saldoMes >= 0 ? C.receita : C.despesa }]}>{fmtSaldo(saldoMes)}</Text>
+            <Text style={[s.statPct, { color: saldoMes >= 0 ? C.receita : C.despesa }]}>
+              {saldoMes >= 0 ? 'Superávit' : `Déficit de ${gastouPctAMais ?? 0}%`}
             </Text>
-          )}
-        </View>
-        <View style={[s.statCard, { width: statCardWidth }]}>
-          <View style={[s.statIcone, { backgroundColor: saldoMes >= 0 ? C.receitaBg : C.despesaBg }]}>
-            {saldoMes >= 0
-              ? <TrendingUp size={16} color={C.receita} strokeWidth={2} />
-              : <TrendingDown size={16} color={C.despesa} strokeWidth={2} />
-            }
           </View>
-          <Text style={s.statLabel}>Diferença</Text>
-          <Text style={[s.statVal, { color: saldoMes >= 0 ? C.receita : C.despesa }]}>{fmtSaldo(saldoMes)}</Text>
-          <Text style={[s.statPct, { color: saldoMes >= 0 ? C.receita : C.despesa }]}>
-            {saldoMes >= 0 ? 'Superávit' : `Déficit de ${gastouPctAMais ?? 0}%`}
-          </Text>
-        </View>
-        <View style={[s.statCard, { width: statCardWidth }]}>
-          <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}>
-            <Calendar size={16} color={C.label} strokeWidth={1.8} />
+          <View style={[s.statCard, { flex: 1 }]}>
+            <View style={[s.statIcone, { backgroundColor: C.bgAccent }]}>
+              <Calendar size={16} color={C.label} strokeWidth={1.8} />
+            </View>
+            <Text style={s.statLabel}>Média diária</Text>
+            <Text style={[s.statVal, { color: C.text }]}>{mediaDiaria > 0 ? fmt(mediaDiaria) : '—'}</Text>
+            <Text style={s.statPct}>Baseado nos {diasNoMes} dias</Text>
           </View>
-          <Text style={s.statLabel}>Média diária</Text>
-          <Text style={[s.statVal, { color: C.text }]}>{mediaDiaria > 0 ? fmt(mediaDiaria) : '—'}</Text>
-          <Text style={s.statPct}>Baseado nos {diasNoMes} dias</Text>
         </View>
-      </ScrollView>
+      )}
 
       {/* ── Linha 3: Evolução + Categorias ── */}
       <View style={{ flexDirection: 'row', gap: 12, marginHorizontal: 16, marginBottom: 12 }}>

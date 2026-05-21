@@ -33,7 +33,7 @@ type Props = {
 
 export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAlertas, mostrarToast, carregando }: Props) {
   const hoje = new Date();
-  const { heroFontSize, statCardWidth, isDesktop } = useBreakpoint();
+  const { heroFontSize, statCardWidth, isDesktop, showRightPanel, rightPanelWidth } = useBreakpoint();
   const { C } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
 
@@ -403,8 +403,8 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
         style={{ marginTop: 0 }}
       />
 
-      {isDesktop ? (
-        /* ── DESKTOP: duas colunas ── */
+      {showRightPanel ? (
+        /* ── MEDIUM / DESKTOP: duas colunas ── */
         <View style={{ flex: 1, flexDirection: 'row', overflow: 'hidden' }}>
 
           {/* Coluna esquerda — conteúdo principal */}
@@ -516,7 +516,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
           </ScrollView>
 
           {/* ── Coluna direita — painel contextual ── */}
-          <View style={s.rightPanel}>
+          <View style={[s.rightPanel, { width: rightPanelWidth }]}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingTop: 12 }}>
 
               {/* Gastos por categoria */}
