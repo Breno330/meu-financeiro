@@ -89,22 +89,22 @@ export function TelaLogin() {
 
             {/* Mini mockup */}
             <View style={{ alignItems: 'flex-start' }}>
-              <View style={{ width: 220, backgroundColor: '#fff', borderRadius: 18, padding: 16, shadowColor: LP.accent, shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 10, borderWidth: 1, borderColor: LP.accentMid }}>
+              <View style={{ width: 220, backgroundColor: C.bgCard, borderRadius: 18, padding: 16, shadowColor: LP.accent, shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 10, borderWidth: 1, borderColor: LP.accentMid }}>
                 <Text style={{ fontSize: 10, color: LP.label, marginBottom: 3 }}>Saldo atual</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                   <Text style={{ fontSize: 20, fontWeight: '700', color: LP.text }}>R$ 2.560,75</Text>
-                  <View style={{ backgroundColor: '#ECFDF5', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 }}>
-                    <Text style={{ fontSize: 9, color: '#10B981', fontWeight: '700' }}>+12,5%</Text>
+                  <View style={{ backgroundColor: C.receitaBg, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 }}>
+                    <Text style={{ fontSize: 9, color: C.receita, fontWeight: '700' }}>+12,5%</Text>
                   </View>
                 </View>
                 <Text style={{ fontSize: 10, color: LP.label, marginBottom: 10 }}>Resumo do mês</Text>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 }}>
                   <View>
-                    <Text style={{ fontSize: 9, color: '#10B981', fontWeight: '600', marginBottom: 2 }}>Receitas</Text>
+                    <Text style={{ fontSize: 9, color: C.receita, fontWeight: '600', marginBottom: 2 }}>Receitas</Text>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: LP.text }}>R$ 4.350,00</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ fontSize: 9, color: '#F43F5E', fontWeight: '600', marginBottom: 2 }}>Despesas</Text>
+                    <Text style={{ fontSize: 9, color: C.despesa, fontWeight: '600', marginBottom: 2 }}>Despesas</Text>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: LP.text }}>R$ 1.789,25</Text>
                   </View>
                 </View>
