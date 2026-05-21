@@ -11,10 +11,11 @@ export const ICONES_CAT: Record<string,string> = {
 };
 
 export const CONTA_TIPOS: { key: string; label: string; icone: string }[] = [
-  { key: 'corrente',     label: 'Conta Corrente', icone: '🏦' },
-  { key: 'poupanca',     label: 'Poupança',        icone: '🐷' },
-  { key: 'carteira',     label: 'Carteira',        icone: '👛' },
-  { key: 'investimento', label: 'Investimento',    icone: '📈' },
+  { key: 'corrente',     label: 'Conta Corrente',    icone: '🏦' },
+  { key: 'poupanca',     label: 'Poupança',           icone: '🐷' },
+  { key: 'carteira',     label: 'Carteira',           icone: '👛' },
+  { key: 'investimento', label: 'Investimento',       icone: '📈' },
+  { key: 'cartao',       label: 'Cartão de Crédito', icone: '💳' },
 ];
 
 export const CONTA_CORES = ['#0EA5E9','#10B981','#F59E0B','#8B5CF6','#F43F5E','#64748B','#EC4899','#14B8A6'];

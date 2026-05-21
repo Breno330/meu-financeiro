@@ -17,7 +17,7 @@ import {
 } from 'lucide-react-native';
 import { MesSeletor } from '../components/MesSeletor';
 import { AppInput } from '../components/AppInput';
-import { CATEGORIAS, MESES, CORES_CAT, CONTA_TIPOS } from '../constants';
+import { CATEGORIAS, MESES, CORES_CAT, CONTA_TIPOS, ICONES_CAT } from '../constants';
 import { CatIcon } from '../constants/catIcons';
 import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, fmtSaldo, saudacao, confirmar } from '../utils/format';
@@ -73,6 +73,9 @@ export function TelaLancamentos({ transacoes, metas, contas, setTransacoes, calc
   // Conta vinculada (null = sem conta)
   const [contaId,     setContaId]     = useState<string | null>(null);
   const [editContaId, setEditContaId] = useState<string | null>(null);
+
+  // Parcelas (só ativo quando conta selecionada for cartão)
+  const [parcelas, setParcelas] = useState(1);
 
   // Filtro por conta
   const [filtroContaId, setFiltroContaId] = useState<string | null>(null);
@@ -154,17 +157,44 @@ export function TelaLancamentos({ transacoes, metas, contas, setTransacoes, calc
     const v = parseFloat(val.replace(/\./g, '').replace(',', '.'));
     if (!desc.trim() || isNaN(v) || v <= 0 || !validarDataLanc(dataLanc)) { mostrarToast('⚠️ Preencha todos os campos corretamente.'); return; }
     setSalvando(true);
+    const resetForm = () => { setDesc(''); setVal(''); setDataLanc(hoje.toLocaleDateString('pt-BR')); setContaId(null); setParcelas(1); };
     try {
-      const payload: any = { descricao: desc.trim(), valor: v, tipo, categoria: cat, data: dataLanc };
-      if (contaId) payload.conta_id = contaId;
-      const { data, error } = await supabase.from('transacoes').insert(payload).select();
-      if (error) throw error;
-      const novas = [data[0], ...transacoes];
-      setTransacoes(novas);
-      setDesc(''); setVal(''); setDataLanc(hoje.toLocaleDateString('pt-BR')); setContaId(null);
-      calcularAlertas(novas, metas);
-      setShowFormModal(false);
-      mostrarToast('✅ Lançamento adicionado!');
+      const isCartao = !!(contaId && contas.find(c => c.id === contaId)?.tipo === 'cartao');
+      const numParcelas = isCartao && parcelas > 1 ? parcelas : 1;
+      if (numParcelas > 1) {
+        const [dia, mes, ano] = dataLanc.split('/').map(Number);
+        const valorParc = Math.round((v / numParcelas) * 100) / 100;
+        const inserts = Array.from({ length: numParcelas }, (_, i) => {
+          const d = new Date(ano, mes - 1 + i, dia);
+          const dataFmt = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+          return {
+            descricao: `${desc.trim()} ${i+1}/${numParcelas}`,
+            valor: i === numParcelas - 1 ? Math.round((v - valorParc * (numParcelas - 1)) * 100) / 100 : valorParc,
+            tipo, categoria: cat, data: dataFmt,
+            parcela_atual: i + 1, parcelas_total: numParcelas,
+            ...(contaId ? { conta_id: contaId } : {}),
+          };
+        });
+        const { data, error } = await supabase.from('transacoes').insert(inserts).select();
+        if (error) throw error;
+        const novas = [...(data as Transacao[]), ...transacoes];
+        setTransacoes(novas);
+        resetForm();
+        calcularAlertas(novas, metas);
+        setShowFormModal(false);
+        mostrarToast(`✅ ${numParcelas}x de ${fmt(valorParc)} adicionadas!`);
+      } else {
+        const payload: any = { descricao: desc.trim(), valor: v, tipo, categoria: cat, data: dataLanc };
+        if (contaId) payload.conta_id = contaId;
+        const { data, error } = await supabase.from('transacoes').insert(payload).select();
+        if (error) throw error;
+        const novas = [data[0] as Transacao, ...transacoes];
+        setTransacoes(novas);
+        resetForm();
+        calcularAlertas(novas, metas);
+        setShowFormModal(false);
+        mostrarToast('✅ Lançamento adicionado!');
+      }
     } catch (err: any) {
       mostrarToast(`❌ Erro ao salvar: ${err.message ?? 'tente novamente'}`);
     } finally {
@@ -261,6 +291,11 @@ export function TelaLancamentos({ transacoes, metas, contas, setTransacoes, calc
           <Text style={s.txDesc}>{t.descricao}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={s.txMeta}>{t.categoria}</Text>
+            {t.parcela_atual && t.parcelas_total ? (
+              <Text style={[s.txMeta, { color: C.brand, fontWeight: '700', fontSize: 11 }]}>
+                {t.parcela_atual}/{t.parcelas_total}
+              </Text>
+            ) : null}
             {t.conta_id && (() => {
               const c = contas.find(c => c.id === t.conta_id);
               return c ? (
@@ -405,7 +440,7 @@ export function TelaLancamentos({ transacoes, metas, contas, setTransacoes, calc
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[s.catScroll, { marginBottom: 12 }]}>
                   <TouchableOpacity
                     style={[s.catBtn, !contaId && { backgroundColor: C.bgAccent, borderColor: C.border }]}
-                    onPress={() => setContaId(null)}
+                    onPress={() => { setContaId(null); setParcelas(1); }}
                   >
                     <Text style={[s.catBtnText, !contaId && { color: C.label }]}>Sem conta</Text>
                   </TouchableOpacity>
@@ -413,16 +448,45 @@ export function TelaLancamentos({ transacoes, metas, contas, setTransacoes, calc
                     <TouchableOpacity
                       key={c.id}
                       style={[s.catBtn, contaId === c.id && { backgroundColor: c.cor + '33', borderColor: c.cor }]}
-                      onPress={() => setContaId(c.id)}
+                      onPress={() => { setContaId(c.id); setParcelas(1); }}
                     >
+                      <Text style={{ fontSize: 12, marginRight: 4 }}>{c.tipo === 'cartao' ? '💳' : ''}</Text>
                       <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.cor, marginRight: 4 }} />
                       <Text style={[s.catBtnText, contaId === c.id && { color: c.cor, fontWeight: '600' }]}>{c.nome}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               )}
+              {/* Parcelas — só exibe quando conta selecionada é cartão */}
+              {contaId && contas.find(c => c.id === contaId)?.tipo === 'cartao' && (
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={[s.catBtnText, { color: C.label, marginBottom: 8, fontSize: 12, fontWeight: '600', textTransform: 'uppercase' as const, letterSpacing: 0.4 }]}>
+                    Parcelas
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {[1,2,3,4,5,6,7,8,9,10,11,12,18,24].map(n => (
+                      <TouchableOpacity
+                        key={n}
+                        style={[s.catBtn, parcelas === n && { backgroundColor: C.brand, borderColor: C.brand }]}
+                        onPress={() => setParcelas(n)}
+                      >
+                        <Text style={[s.catBtnText, parcelas === n && { color: C.primaryDark, fontWeight: '700' }]}>{n}x</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                  {parcelas > 1 && (() => {
+                    const vNum = parseFloat(val.replace(/\./g,'').replace(',','.')) || 0;
+                    const parcelaVal = vNum > 0 ? Math.round(vNum / parcelas * 100) / 100 : 0;
+                    return (
+                      <Text style={{ fontSize: 11, color: C.label, marginTop: 6 }}>
+                        {parcelas}x de {fmt(parcelaVal)}  ·  total {fmt(vNum)}
+                      </Text>
+                    );
+                  })()}
+                </View>
+              )}
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-                <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: C.bgAccent }]} onPress={() => { setShowFormModal(false); setDesc(''); setVal(''); setDataLanc(hoje.toLocaleDateString('pt-BR')); }}>
+                <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: C.bgAccent }]} onPress={() => { setShowFormModal(false); setDesc(''); setVal(''); setDataLanc(hoje.toLocaleDateString('pt-BR')); setParcelas(1); }}>
                   <Text style={[s.btnText, { color: C.primaryDark }]}>Cancelar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[s.btn, { flex: 2, backgroundColor: C.brand, opacity: salvando ? 0.6 : 1 }]} onPress={adicionar} disabled={salvando}>
@@ -795,6 +859,28 @@ export function TelaLancamentos({ transacoes, metas, contas, setTransacoes, calc
               </TouchableOpacity>
             ))}
           </View>
+
+          {/* Filtros — conta (só quando há contas cadastradas) */}
+          {contas.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[s.filtros, { paddingTop: 0, marginTop: -4 }]}>
+              <TouchableOpacity
+                style={[s.filtroBtn, !filtroContaId && { backgroundColor: C.bgAccent, borderColor: C.border }]}
+                onPress={() => setFiltroContaId(null)}
+              >
+                <Text style={[s.filtroBtnText, !filtroContaId && { color: C.text }]}>Todas as contas</Text>
+              </TouchableOpacity>
+              {contas.map(c => (
+                <TouchableOpacity
+                  key={c.id}
+                  style={[s.filtroBtn, filtroContaId === c.id && { backgroundColor: c.cor + '33', borderColor: c.cor }]}
+                  onPress={() => setFiltroContaId(filtroContaId === c.id ? null : c.id)}
+                >
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.cor, marginRight: 4 }} />
+                  <Text style={[s.filtroBtnText, filtroContaId === c.id && { color: c.cor, fontWeight: '600' }]}>{c.nome}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
 
           {/* Lista agrupada */}
           {carregando ? (

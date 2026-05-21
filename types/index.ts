@@ -1,6 +1,6 @@
 export type Tipo = 'receita' | 'despesa';
 export type Aba = 'lancamentos' | 'resumo' | 'metas' | 'importar';
-export type ContaTipo = 'corrente' | 'poupanca' | 'carteira' | 'investimento';
+export type ContaTipo = 'corrente' | 'poupanca' | 'carteira' | 'investimento' | 'cartao';
 
 export type Conta = {
   id: string;
@@ -9,6 +9,9 @@ export type Conta = {
   saldo_inicial: number;
   cor: string;
   ativo: boolean;
+  limite?: number | null;
+  dia_fechamento?: number | null;
+  dia_vencimento?: number | null;
 };
 
 export type Transacao = {
@@ -20,6 +23,8 @@ export type Transacao = {
   data: string;
   conta_id?: string | null;
   criado_em?: string;
+  parcela_atual?: number | null;
+  parcelas_total?: number | null;
 };
 
 export type Meta = {

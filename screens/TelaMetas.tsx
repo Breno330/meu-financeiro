@@ -49,11 +49,14 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, setMetas, se
   const [showContaForm, setShowContaForm] = useState(false);
 
   // Conta form
-  const [contaNome,   setContaNome]   = useState('');
-  const [contaTipo,   setContaTipo]   = useState('corrente');
-  const [contaSaldo,  setContaSaldo]  = useState('');
-  const [contaCor,    setContaCor]    = useState(CONTA_CORES[0]);
-  const [salvandoConta, setSalvandoConta] = useState(false);
+  const [contaNome,       setContaNome]       = useState('');
+  const [contaTipo,       setContaTipo]       = useState('corrente');
+  const [contaSaldo,      setContaSaldo]      = useState('');
+  const [contaLimite,     setContaLimite]     = useState('');
+  const [contaFechamento, setContaFechamento] = useState('');
+  const [contaVencimento, setContaVencimento] = useState('');
+  const [contaCor,        setContaCor]        = useState(CONTA_CORES[0]);
+  const [salvandoConta,   setSalvandoConta]   = useState(false);
 
   // Meta form
   const [metaTipo, setMetaTipo] = useState<'saldo' | 'categoria'>('saldo');
@@ -95,18 +98,35 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, setMetas, se
     return c.saldo_inicial + rec - desp;
   }
 
+  function faturaCartao(c: Conta): number {
+    const mes = hoje.getMonth();
+    const ano = hoje.getFullYear();
+    return transacoes
+      .filter(t => t.conta_id === c.id && t.tipo === 'despesa')
+      .filter(t => {
+        const p = t.data?.split('/');
+        return p && parseInt(p[1]) - 1 === mes && parseInt(p[2]) === ano;
+      })
+      .reduce((s, t) => s + Number(t.valor), 0);
+  }
+
   async function adicionarConta() {
     if (!contaNome.trim()) { mostrarToast('Informe o nome da conta.'); return; }
-    const si = parseFloat(contaSaldo.replace(/\./g, '').replace(',', '.')) || 0;
+    const isCartao = contaTipo === 'cartao';
+    const lim  = isCartao ? (parseFloat(contaLimite.replace(/\./g, '').replace(',', '.')) || 0) : null;
+    const fech = isCartao ? (parseInt(contaFechamento) || null) : null;
+    const venc = isCartao ? (parseInt(contaVencimento) || null) : null;
+    if (isCartao && !lim) { mostrarToast('Informe o limite do cartão.'); return; }
+    const si = isCartao ? 0 : (parseFloat(contaSaldo.replace(/\./g, '').replace(',', '.')) || 0);
     setSalvandoConta(true);
     try {
-      const { data, error } = await supabase.from('contas').insert({
-        nome: contaNome.trim(), tipo: contaTipo,
-        saldo_inicial: si, cor: contaCor, ativo: true,
-      }).select();
+      const payload: any = { nome: contaNome.trim(), tipo: contaTipo, saldo_inicial: si, cor: contaCor, ativo: true };
+      if (isCartao) { payload.limite = lim; payload.dia_fechamento = fech; payload.dia_vencimento = venc; }
+      const { data, error } = await supabase.from('contas').insert(payload).select();
       if (error) throw error;
       setContas([...contas, data[0]]);
-      setContaNome(''); setContaSaldo(''); setContaCor(CONTA_CORES[0]); setContaTipo('corrente');
+      setContaNome(''); setContaSaldo(''); setContaLimite(''); setContaFechamento(''); setContaVencimento('');
+      setContaCor(CONTA_CORES[0]); setContaTipo('corrente');
       LayoutAnimation.configureNext(LAYOUT_ANIM);
       setShowContaForm(false);
       mostrarToast('Conta criada!');
@@ -268,18 +288,23 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, setMetas, se
       {/* ══════════════════════════════════════════════════════════════════
           SEÇÃO 0 — CONTAS
       ══════════════════════════════════════════════════════════════════ */}
+      {(() => {
+        const bancarias = contas.filter(c => c.tipo !== 'cartao');
+        const cartoes   = contas.filter(c => c.tipo === 'cartao');
+        const saldoTotal = bancarias.reduce((acc, c) => acc + saldoConta(c), 0);
+        const subTexto = contas.length === 0 ? 'Nenhuma conta cadastrada'
+          : [
+              bancarias.length > 0 && `${bancarias.length} conta${bancarias.length > 1 ? 's' : ''} · ${fmt(saldoTotal)}`,
+              cartoes.length   > 0 && `${cartoes.length} cartão${cartoes.length > 1 ? 'ões' : ''}`,
+            ].filter(Boolean).join('  ·  ');
+        return (
       <View style={s.section}>
 
         {/* Cabeçalho */}
         <View style={s.sectionHeader}>
           <View>
             <Text style={s.sectionTitle}>Minhas contas</Text>
-            <Text style={s.sectionSub}>
-              {contas.length === 0
-                ? 'Nenhuma conta cadastrada'
-                : `${contas.length} conta${contas.length > 1 ? 's' : ''} · saldo total ${fmt(contas.reduce((acc, c) => acc + saldoConta(c), 0))}`
-              }
-            </Text>
+            <Text style={s.sectionSub}>{subTexto}</Text>
           </View>
           <TouchableOpacity
             style={[s.addBtn, showContaForm && s.addBtnActive]}
@@ -305,8 +330,55 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, setMetas, se
         )}
 
         {contas.map(c => {
-          const saldo = saldoConta(c);
           const tipoInfo = CONTA_TIPOS.find(t => t.key === c.tipo);
+          if (c.tipo === 'cartao') {
+            const fatura    = faturaCartao(c);
+            const limite    = Number(c.limite) || 0;
+            const disponivel = Math.max(limite - fatura, 0);
+            const pctFatura = limite > 0 ? Math.min(fatura / limite, 1) : 0;
+            const barColor  = pctFatura > 0.9 ? C.despesa : pctFatura > 0.7 ? '#F59E0B' : C.receita;
+            return (
+              <View key={c.id} style={[s.recItem, { borderLeftWidth: 3, borderLeftColor: c.cor, flexDirection: 'column', gap: 0 }]}>
+                {/* Header */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <View style={[s.recIcone, { backgroundColor: c.cor + '22' }]}>
+                    <Text style={{ fontSize: 18 }}>💳</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.recDesc}>{c.nome}</Text>
+                    <Text style={s.recMeta}>
+                      Cartão de Crédito
+                      {c.dia_fechamento ? `  ·  fecha dia ${c.dia_fechamento}` : ''}
+                      {c.dia_vencimento ? `  ·  vence dia ${c.dia_vencimento}` : ''}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => removerConta(c.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Trash2 size={14} color={C.textLight} strokeWidth={1.8} />
+                  </TouchableOpacity>
+                </View>
+                {/* Barra fatura/limite */}
+                <View style={{ height: 6, backgroundColor: C.bgAccent, borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
+                  <View style={{ height: 6, borderRadius: 3, backgroundColor: barColor, width: `${Math.round(pctFatura * 100)}%` as any }} />
+                </View>
+                {/* Números */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <View>
+                    <Text style={{ fontSize: 10, color: C.textLight }}>Fatura</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: C.despesa }}>{fmt(fatura)}</Text>
+                  </View>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 10, color: C.textLight }}>Limite</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: C.label }}>{fmt(limite)}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 10, color: C.textLight }}>Disponível</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: C.receita }}>{fmt(disponivel)}</Text>
+                  </View>
+                </View>
+              </View>
+            );
+          }
+          const saldo = saldoConta(c);
           return (
             <View key={c.id} style={[s.recItem, { borderLeftWidth: 3, borderLeftColor: c.cor }]}>
               {/* Ícone colorido */}
@@ -363,16 +435,58 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, setMetas, se
               ))}
             </ScrollView>
 
-            {/* Saldo inicial */}
-            <Text style={s.formFieldLabel}>Saldo inicial (R$)</Text>
-            <TextInput
-              style={s.input}
-              placeholder="0,00"
-              placeholderTextColor={C.textLight}
-              keyboardType="numeric"
-              value={contaSaldo}
-              onChangeText={setContaSaldo}
-            />
+            {/* Saldo inicial ou Limite (dependendo do tipo) */}
+            {contaTipo === 'cartao' ? (
+              <>
+                <Text style={s.formFieldLabel}>Limite do cartão (R$)</Text>
+                <TextInput
+                  style={s.input}
+                  placeholder="5.000,00"
+                  placeholderTextColor={C.textLight}
+                  keyboardType="numeric"
+                  value={contaLimite}
+                  onChangeText={setContaLimite}
+                />
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.formFieldLabel}>Dia de fechamento</Text>
+                    <TextInput
+                      style={s.input}
+                      placeholder="ex: 25"
+                      placeholderTextColor={C.textLight}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                      value={contaFechamento}
+                      onChangeText={setContaFechamento}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.formFieldLabel}>Dia de vencimento</Text>
+                    <TextInput
+                      style={s.input}
+                      placeholder="ex: 10"
+                      placeholderTextColor={C.textLight}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                      value={contaVencimento}
+                      onChangeText={setContaVencimento}
+                    />
+                  </View>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={s.formFieldLabel}>Saldo inicial (R$)</Text>
+                <TextInput
+                  style={s.input}
+                  placeholder="0,00"
+                  placeholderTextColor={C.textLight}
+                  keyboardType="numeric"
+                  value={contaSaldo}
+                  onChangeText={setContaSaldo}
+                />
+              </>
+            )}
 
             {/* Cor */}
             <Text style={s.formFieldLabel}>Cor</Text>
@@ -403,6 +517,8 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, setMetas, se
           </View>
         )}
       </View>
+        );
+      })()}
 
       {/* ══════════════════════════════════════════════════════════════════
           SEÇÃO 1 — METAS DO MÊS
