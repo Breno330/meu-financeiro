@@ -55,6 +55,24 @@ export type Recorrente = {
   parcelas_restantes?: number | null;
 };
 
+export type Orcamento = {
+  id: string;
+  categoria: string;
+  valor_planejado: number;
+  mes: number;
+  ano: number;
+};
+
+export type Divida = {
+  id: string;
+  nome: string;
+  valor_total: number;
+  saldo_devedor: number;
+  parcela_mensal: number;
+  taxa_juros?: number | null;
+  ativo: boolean;
+};
+
 export type TransacaoOFX = {
   id: string;
   descricao: string;

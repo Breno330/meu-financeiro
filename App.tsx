@@ -16,7 +16,7 @@ import { ThemeProvider, useTheme, type ColorPalette } from './contexts/ThemeCont
 import { useToast } from './hooks/useToast';
 import { useBreakpoint } from './hooks/useBreakpoint';
 import { T } from './components/T';
-import type { Transacao, Meta, Recorrente, Aba, Conta, Categoria } from './types';
+import type { Transacao, Meta, Recorrente, Aba, Conta, Categoria, Orcamento, Divida } from './types';
 import { RADIUS, SPACE } from './theme/tokens';
 
 import { TelaLogin } from './screens/TelaLogin';
@@ -70,6 +70,8 @@ function AppInner() {
   const [recorrentes, setRecorrentes] = useState<Recorrente[]>([]);
   const [contas, setContas] = useState<Conta[]>([]);
   const [categoriasCustom, setCategoriasCustom] = useState<Categoria[]>([]);
+  const [orcamentos,       setOrcamentos]       = useState<Orcamento[]>([]);
+  const [dividas,          setDividas]          = useState<Divida[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [alertas, setAlertas] = useState<string[]>([]);
   const [showAlertas, setShowAlertas] = useState(false);
@@ -137,20 +139,24 @@ function AppInner() {
   async function carregarTudo() {
     setCarregando(true);
     try {
-      const [r1, r2, r3, r4, r5] = await Promise.all([
+      const [r1, r2, r3, r4, r5, r6, r7] = await Promise.all([
         supabase.from('transacoes').select('*').order('criado_em', { ascending: false }),
         supabase.from('metas').select('*'),
         supabase.from('recorrentes').select('*').eq('ativo', true),
         supabase.from('contas').select('*').eq('ativo', true).order('criado_em', { ascending: true }),
         supabase.from('categorias').select('*').eq('ativo', true).order('criado_em', { ascending: true }),
+        supabase.from('orcamentos').select('*'),
+        supabase.from('dividas').select('*').eq('ativo', true),
       ]);
 
       if (r1.error) throw new Error(`Transações: ${r1.error.message}`);
       if (r2.error) throw new Error(`Metas: ${r2.error.message}`);
       if (r3.error) throw new Error(`Recorrentes: ${r3.error.message}`);
-      // contas e categorias: falha silenciosa se tabela ainda não existe
+      // tabelas opcionais: falha silenciosa se ainda não existem
       if (!r4.error) setContas(r4.data || []);
       if (!r5.error) setCategoriasCustom(r5.data || []);
+      if (!r6.error) setOrcamentos(r6.data || []);
+      if (!r7.error) setDividas(r7.data || []);
 
       let todasTx: Transacao[] = r1.data || [];
       const todasMetas: Meta[] = r2.data || [];
@@ -364,6 +370,8 @@ function AppInner() {
                 transacoes={transacoes} metas={metas} recorrentes={recorrentes}
                 contas={contas} setContas={setContas}
                 categoriasCustom={categoriasCustom} setCategoriasCustom={setCategoriasCustom}
+                orcamentos={orcamentos} setOrcamentos={setOrcamentos}
+                dividas={dividas} setDividas={setDividas}
                 setMetas={setMetas} setRecorrentes={setRecorrentes}
                 calcularAlertas={calcularAlertas} mostrarToast={mostrarToast}
               />

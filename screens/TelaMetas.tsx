@@ -23,7 +23,7 @@ import { CATEGORIAS, MESES, CONTA_TIPOS, CONTA_CORES } from '../constants';
 import { CatIcon } from '../constants/catIcons';
 import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, confirmar } from '../utils/format';
-import type { Transacao, Meta, Recorrente, Tipo, Conta, Categoria } from '../types';
+import type { Transacao, Meta, Recorrente, Tipo, Conta, Categoria, Orcamento, Divida } from '../types';
 import { RADIUS, SHADOW, SPACE, TYPE } from '../theme/tokens';
 
 type Props = {
@@ -32,15 +32,19 @@ type Props = {
   recorrentes: Recorrente[];
   contas: Conta[];
   categoriasCustom: Categoria[];
+  orcamentos: Orcamento[];
+  dividas: Divida[];
   setMetas: React.Dispatch<React.SetStateAction<Meta[]>>;
   setRecorrentes: React.Dispatch<React.SetStateAction<Recorrente[]>>;
   setContas: React.Dispatch<React.SetStateAction<Conta[]>>;
   setCategoriasCustom: React.Dispatch<React.SetStateAction<Categoria[]>>;
+  setOrcamentos: React.Dispatch<React.SetStateAction<Orcamento[]>>;
+  setDividas: React.Dispatch<React.SetStateAction<Divida[]>>;
   calcularAlertas: (txs: Transacao[], mts: Meta[]) => void;
   mostrarToast: (msg: string) => void;
 };
 
-export function TelaMetas({ transacoes, metas, recorrentes, contas, categoriasCustom, setMetas, setRecorrentes, setContas, setCategoriasCustom, calcularAlertas, mostrarToast }: Props) {
+export function TelaMetas({ transacoes, metas, recorrentes, contas, categoriasCustom, orcamentos, dividas, setMetas, setRecorrentes, setContas, setCategoriasCustom, setOrcamentos, setDividas, calcularAlertas, mostrarToast }: Props) {
   const hoje = new Date();
   const { C } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
@@ -66,6 +70,20 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, categoriasCu
   const [contaVencimento, setContaVencimento] = useState('');
   const [contaCor,        setContaCor]        = useState(CONTA_CORES[0]);
   const [salvandoConta,   setSalvandoConta]   = useState(false);
+
+  // Orçamento form
+  const [showOrcForm,  setShowOrcForm]  = useState(false);
+  const [orcValues,    setOrcValues]    = useState<Record<string, string>>({});
+  const [salvandoOrc,  setSalvandoOrc]  = useState(false);
+
+  // Dívida form
+  const [showDivForm,  setShowDivForm]  = useState(false);
+  const [divNome,      setDivNome]      = useState('');
+  const [divTotal,     setDivTotal]     = useState('');
+  const [divSaldo,     setDivSaldo]     = useState('');
+  const [divParcela,   setDivParcela]   = useState('');
+  const [divJuros,     setDivJuros]     = useState('');
+  const [salvandoDiv,  setSalvandoDiv]  = useState(false);
 
   // Meta form
   const [metaTipo, setMetaTipo] = useState<'saldo' | 'categoria'>('saldo');
@@ -102,6 +120,105 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, categoriasCu
   function toggleCat() {
     LayoutAnimation.configureNext(LAYOUT_ANIM);
     setShowCatForm(v => !v);
+  }
+
+  function toggleOrc() {
+    LayoutAnimation.configureNext(LAYOUT_ANIM);
+    if (!showOrcForm) {
+      // Pré-preenche valores existentes do mês atual
+      const mes = hoje.getMonth(); const ano = hoje.getFullYear();
+      const vals: Record<string, string> = {};
+      orcamentos.filter(o => o.mes === mes && o.ano === ano).forEach(o => {
+        vals[o.categoria] = String(o.valor_planejado).replace('.', ',');
+      });
+      setOrcValues(vals);
+    }
+    setShowOrcForm(v => !v);
+  }
+
+  async function salvarOrcamento() {
+    setSalvandoOrc(true);
+    const mes = hoje.getMonth(); const ano = hoje.getFullYear();
+    try {
+      const rows = Object.entries(orcValues)
+        .map(([categoria, v]) => ({ categoria, valor_planejado: parseFloat(v.replace(/\./g,'').replace(',','.')), mes, ano }))
+        .filter(o => !isNaN(o.valor_planejado) && o.valor_planejado > 0);
+      if (rows.length > 0) {
+        const { error } = await supabase.from('orcamentos').upsert(rows, { onConflict: 'user_id,categoria,mes,ano' });
+        if (error) throw error;
+      }
+      // Remove categorias zeradas/apagadas
+      const removidas = orcamentos
+        .filter(o => o.mes === mes && o.ano === ano && (!orcValues[o.categoria] || parseFloat(orcValues[o.categoria].replace(/\./g,'').replace(',','.')) <= 0));
+      for (const o of removidas) {
+        await supabase.from('orcamentos').delete().eq('id', o.id);
+      }
+      const { data } = await supabase.from('orcamentos').select('*');
+      setOrcamentos(data || []);
+      LayoutAnimation.configureNext(LAYOUT_ANIM);
+      setShowOrcForm(false);
+      mostrarToast('Orçamento salvo!');
+    } catch (err: any) {
+      mostrarToast(`Erro ao salvar orçamento: ${err.message ?? 'tente novamente'}`);
+    } finally {
+      setSalvandoOrc(false);
+    }
+  }
+
+  function toggleDiv() {
+    LayoutAnimation.configureNext(LAYOUT_ANIM);
+    setShowDivForm(v => !v);
+  }
+
+  async function adicionarDivida() {
+    if (!divNome.trim()) { mostrarToast('Informe o nome da dívida.'); return; }
+    const total   = parseFloat(divTotal.replace(/\./g,'').replace(',','.'));
+    const saldo   = parseFloat(divSaldo.replace(/\./g,'').replace(',','.'));
+    const parcela = parseFloat(divParcela.replace(/\./g,'').replace(',','.'));
+    if (isNaN(total) || total <= 0)   { mostrarToast('Informe o valor total.'); return; }
+    if (isNaN(saldo) || saldo < 0)    { mostrarToast('Informe o saldo devedor.'); return; }
+    if (isNaN(parcela) || parcela <= 0) { mostrarToast('Informe a parcela mensal.'); return; }
+    const juros = divJuros ? parseFloat(divJuros.replace(',','.')) : null;
+    setSalvandoDiv(true);
+    try {
+      const { data, error } = await supabase.from('dividas').insert({
+        nome: divNome.trim(), valor_total: total, saldo_devedor: saldo,
+        parcela_mensal: parcela, taxa_juros: juros, ativo: true,
+      }).select();
+      if (error) throw error;
+      setDividas([...dividas, data[0]]);
+      setDivNome(''); setDivTotal(''); setDivSaldo(''); setDivParcela(''); setDivJuros('');
+      LayoutAnimation.configureNext(LAYOUT_ANIM);
+      setShowDivForm(false);
+      mostrarToast('Dívida adicionada!');
+    } catch (err: any) {
+      mostrarToast(`Erro ao salvar dívida: ${err.message ?? 'tente novamente'}`);
+    } finally {
+      setSalvandoDiv(false);
+    }
+  }
+
+  async function pagarParcela(div: Divida) {
+    const novoSaldo = Math.max(0, div.saldo_devedor - div.parcela_mensal);
+    confirmar(
+      'Registrar parcela',
+      `Reduzir saldo de ${fmt(div.saldo_devedor)} para ${fmt(novoSaldo)}?`,
+      async () => {
+        const { error } = await supabase.from('dividas').update({ saldo_devedor: novoSaldo }).eq('id', div.id);
+        if (error) { mostrarToast(`Erro: ${error.message}`); return; }
+        setDividas(dividas.map(d => d.id === div.id ? { ...d, saldo_devedor: novoSaldo } : d));
+        mostrarToast('Parcela registrada! Lembre de lançar o pagamento em Início.');
+      }
+    );
+  }
+
+  async function removerDivida(id: string) {
+    confirmar('Remover dívida', 'Deseja remover esta dívida do controle?', async () => {
+      const { error } = await supabase.from('dividas').update({ ativo: false }).eq('id', id);
+      if (error) { mostrarToast(`Erro: ${error.message}`); return; }
+      setDividas(dividas.filter(d => d.id !== id));
+      mostrarToast('Dívida removida.');
+    });
   }
 
   async function adicionarCategoria() {
@@ -824,7 +941,264 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, categoriasCu
       </View>
 
       {/* ══════════════════════════════════════════════════════════════════
-          SEÇÃO 2 — RECORRENTES
+          SEÇÃO 2 — ORÇAMENTO PLANEJADO VS. REALIZADO
+      ══════════════════════════════════════════════════════════════════ */}
+      {(() => {
+        const mes = hoje.getMonth(); const ano = hoje.getFullYear();
+        const orcMes = orcamentos.filter(o => o.mes === mes && o.ano === ano);
+        const txMes  = transacoes.filter(t => {
+          const p = t.data?.split('/');
+          return p && parseInt(p[1]) - 1 === mes && parseInt(p[2]) === ano;
+        });
+        const totalPlan  = orcMes.reduce((s, o) => s + o.valor_planejado, 0);
+        const totalReal  = txMes.filter(t => t.tipo === 'despesa').reduce((s, t) => s + Number(t.valor), 0);
+        const totalDiff  = totalPlan - totalReal;
+        const todasCats  = [...CATEGORIAS, ...categoriasCustom.map(c => c.nome)].filter(c => c !== 'Salário');
+        return (
+          <View style={s.section}>
+            <View style={s.sectionHeader}>
+              <View>
+                <Text style={s.sectionTitle}>Orçamento de {MESES[mes]}</Text>
+                <Text style={s.sectionSub}>
+                  {orcMes.length === 0
+                    ? 'Nenhum orçamento definido'
+                    : `Planejado ${fmt(totalPlan)}  ·  Realizado ${fmt(totalReal)}`}
+                </Text>
+              </View>
+              <TouchableOpacity style={[s.addBtn, showOrcForm && s.addBtnActive]} onPress={toggleOrc}>
+                {showOrcForm
+                  ? <ChevronUp size={14} color={C.primaryDark} strokeWidth={2.5} />
+                  : <Plus      size={14} color={C.primaryDark} strokeWidth={2.5} />
+                }
+                <Text style={s.addBtnText}>{showOrcForm ? 'Cancelar' : 'Editar'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Resumo: disponível / gasto */}
+            {orcMes.length > 0 && !showOrcForm && (
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+                <View style={[s.statMini, { backgroundColor: totalDiff >= 0 ? C.receitaBg : C.despesaBg }]}>
+                  <Text style={{ fontSize: 10, color: C.textLight }}>Disponível</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: totalDiff >= 0 ? C.receita : C.despesa }}>
+                    {totalDiff >= 0 ? fmt(totalDiff) : `-${fmt(Math.abs(totalDiff))}`}
+                  </Text>
+                </View>
+                <View style={[s.statMini, { backgroundColor: C.bgAccent }]}>
+                  <Text style={{ fontSize: 10, color: C.textLight }}>% Usado</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: C.text }}>
+                    {totalPlan > 0 ? `${Math.round(totalReal / totalPlan * 100)}%` : '—'}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Empty state */}
+            {orcMes.length === 0 && !showOrcForm && (
+              <View style={s.emptySection}>
+                <View style={s.emptySectionIcon}>
+                  <TrendingUp size={24} color={C.textLight} strokeWidth={1.5} />
+                </View>
+                <Text style={s.emptySectionTitle}>Orçamento não definido</Text>
+                <Text style={s.emptySectionSub}>Defina quanto planeja gastar em cada categoria para comparar com o realizado.</Text>
+              </View>
+            )}
+
+            {/* Barras por categoria */}
+            {!showOrcForm && orcMes.map(orc => {
+              const gasto = txMes.filter(t => t.tipo === 'despesa' && t.categoria === orc.categoria).reduce((s, t) => s + Number(t.valor), 0);
+              const pct   = orc.valor_planejado > 0 ? Math.min(gasto / orc.valor_planejado, 1) : 0;
+              const ok    = gasto <= orc.valor_planejado;
+              const barColor = ok ? (pct > 0.8 ? '#F59E0B' : C.receita) : C.despesa;
+              const custom = categoriasCustom.find(c => c.nome === orc.categoria);
+              return (
+                <View key={orc.id} style={s.orcItem}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      {custom
+                        ? <Text style={{ fontSize: 13 }}>{custom.icone}</Text>
+                        : <CatIcon categoria={orc.categoria} size={13} color={C.label} strokeWidth={2} />
+                      }
+                      <Text style={{ fontSize: 13, color: C.text, fontWeight: '500' }}>{orc.categoria}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: barColor }}>{fmt(gasto)}</Text>
+                      <Text style={{ fontSize: 10, color: C.textLight }}>de {fmt(orc.valor_planejado)}</Text>
+                    </View>
+                  </View>
+                  <View style={{ height: 6, backgroundColor: C.bgAccent, borderRadius: 3, overflow: 'hidden' }}>
+                    <View style={{ height: 6, borderRadius: 3, backgroundColor: barColor, width: `${Math.round(pct * 100)}%` as any }} />
+                  </View>
+                  <Text style={{ fontSize: 10, color: C.textLight, marginTop: 4 }}>
+                    {Math.round(pct * 100)}% utilizado  ·  {ok ? `sobra ${fmt(orc.valor_planejado - gasto)}` : `excedeu ${fmt(gasto - orc.valor_planejado)}`}
+                  </Text>
+                </View>
+              );
+            })}
+
+            {/* Formulário de edição */}
+            {showOrcForm && (
+              <View style={s.inlineForm}>
+                <View style={s.formDivider} />
+                <Text style={[s.formFieldLabel, { marginBottom: 14 }]}>
+                  Defina o orçamento por categoria para {MESES[mes]}. Deixe em branco para remover.
+                </Text>
+                {todasCats.map(cat => {
+                  const custom = categoriasCustom.find(c => c.nome === cat);
+                  return (
+                    <View key={cat} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                      <View style={{ width: 28, alignItems: 'center' }}>
+                        {custom
+                          ? <Text style={{ fontSize: 16 }}>{custom.icone}</Text>
+                          : <CatIcon categoria={cat} size={16} color={C.label} strokeWidth={2} />
+                        }
+                      </View>
+                      <Text style={{ flex: 1, fontSize: 13, color: C.text }}>{cat}</Text>
+                      <TextInput
+                        style={[s.input, { flex: 0, width: 110, textAlign: 'right', marginBottom: 0, paddingVertical: 8 }]}
+                        placeholder="R$ —"
+                        placeholderTextColor={C.textLight}
+                        keyboardType="decimal-pad"
+                        value={orcValues[cat] ?? ''}
+                        onChangeText={v => setOrcValues(prev => ({ ...prev, [cat]: v }))}
+                      />
+                    </View>
+                  );
+                })}
+                <TouchableOpacity
+                  style={[s.ctaBtn, { opacity: salvandoOrc ? 0.6 : 1, marginTop: 8 }]}
+                  onPress={salvarOrcamento}
+                  disabled={salvandoOrc}
+                >
+                  <Text style={s.ctaBtnText}>{salvandoOrc ? 'Salvando...' : 'Salvar orçamento'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        );
+      })()}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          SEÇÃO 2b — CONTROLE DE DÍVIDAS
+      ══════════════════════════════════════════════════════════════════ */}
+      {(() => {
+        const totalDev    = dividas.reduce((s, d) => s + d.saldo_devedor, 0);
+        const totalParc   = dividas.reduce((s, d) => s + d.parcela_mensal, 0);
+        return (
+          <View style={s.section}>
+            <View style={s.sectionHeader}>
+              <View>
+                <Text style={s.sectionTitle}>Minhas dívidas</Text>
+                <Text style={s.sectionSub}>
+                  {dividas.length === 0
+                    ? 'Nenhuma dívida cadastrada'
+                    : `${fmt(totalDev)} em aberto  ·  ${fmt(totalParc)}/mês`}
+                </Text>
+              </View>
+              <TouchableOpacity style={[s.addBtn, showDivForm && s.addBtnActive]} onPress={toggleDiv}>
+                {showDivForm
+                  ? <ChevronUp size={14} color={C.primaryDark} strokeWidth={2.5} />
+                  : <Plus      size={14} color={C.primaryDark} strokeWidth={2.5} />
+                }
+                <Text style={s.addBtnText}>{showDivForm ? 'Cancelar' : 'Nova'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {dividas.length === 0 && !showDivForm && (
+              <View style={s.emptySection}>
+                <View style={s.emptySectionIcon}>
+                  <TrendingDown size={24} color={C.textLight} strokeWidth={1.5} />
+                </View>
+                <Text style={s.emptySectionTitle}>Sem dívidas cadastradas</Text>
+                <Text style={s.emptySectionSub}>Adicione empréstimos, financiamentos e parcelamentos para acompanhar o que falta pagar.</Text>
+              </View>
+            )}
+
+            {dividas.map(d => {
+              const pago    = Math.max(0, d.valor_total - d.saldo_devedor);
+              const pct     = d.valor_total > 0 ? Math.min(pago / d.valor_total, 1) : 0;
+              const parcRest = d.parcela_mensal > 0 ? Math.ceil(d.saldo_devedor / d.parcela_mensal) : null;
+              const barColor = pct > 0.7 ? C.receita : pct > 0.4 ? '#F59E0B' : C.despesa;
+              return (
+                <View key={d.id} style={[s.metaItem, { marginBottom: 10 }]}>
+                  {/* Header */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <View style={[s.metaIcone, { backgroundColor: C.despesaBg }]}>
+                      <TrendingDown size={14} color={C.despesa} strokeWidth={2} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.metaLabel}>{d.nome}</Text>
+                      <Text style={s.metaLabelSub}>
+                        {fmt(d.parcela_mensal)}/mês
+                        {d.taxa_juros ? `  ·  ${d.taxa_juros}% a.m.` : ''}
+                        {parcRest ? `  ·  ~${parcRest} parcelas restantes` : ''}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                      <TouchableOpacity
+                        style={{ backgroundColor: C.brand, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}
+                        onPress={() => pagarParcela(d)}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: C.primaryDark }}>Pagar parcela</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => removerDivida(d.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Trash2 size={14} color={C.textLight} strokeWidth={1.8} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  {/* Barra de progresso */}
+                  <View style={{ height: 8, backgroundColor: C.bgAccent, borderRadius: 4, overflow: 'hidden', marginBottom: 6 }}>
+                    <View style={{ height: 8, borderRadius: 4, backgroundColor: barColor, width: `${Math.round(pct * 100)}%` as any }} />
+                  </View>
+                  {/* Valores */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 11, color: C.textLight }}>{Math.round(pct * 100)}% pago  ·  {fmt(pago)} quitado</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: C.despesa }}>{fmt(d.saldo_devedor)} em aberto</Text>
+                  </View>
+                </View>
+              );
+            })}
+
+            {/* Formulário nova dívida */}
+            {showDivForm && (
+              <View style={s.inlineForm}>
+                <View style={s.formDivider} />
+
+                <Text style={s.formFieldLabel}>Nome da dívida</Text>
+                <TextInput style={s.input} placeholder="Ex: Financiamento, Empréstimo..." placeholderTextColor={C.textLight} value={divNome} onChangeText={setDivNome} />
+
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.formFieldLabel}>Valor total (R$)</Text>
+                    <TextInput style={s.input} placeholder="30.000,00" placeholderTextColor={C.textLight} keyboardType="decimal-pad" value={divTotal} onChangeText={setDivTotal} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.formFieldLabel}>Saldo devedor (R$)</Text>
+                    <TextInput style={s.input} placeholder="18.500,00" placeholderTextColor={C.textLight} keyboardType="decimal-pad" value={divSaldo} onChangeText={setDivSaldo} />
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.formFieldLabel}>Parcela mensal (R$)</Text>
+                    <TextInput style={s.input} placeholder="850,00" placeholderTextColor={C.textLight} keyboardType="decimal-pad" value={divParcela} onChangeText={setDivParcela} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.formFieldLabel}>Taxa de juros (% a.m.)</Text>
+                    <TextInput style={s.input} placeholder="1,5" placeholderTextColor={C.textLight} keyboardType="decimal-pad" value={divJuros} onChangeText={setDivJuros} />
+                  </View>
+                </View>
+
+                <TouchableOpacity style={[s.ctaBtn, { opacity: salvandoDiv ? 0.6 : 1 }]} onPress={adicionarDivida} disabled={salvandoDiv}>
+                  <Text style={s.ctaBtnText}>{salvandoDiv ? 'Salvando...' : 'Adicionar dívida'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        );
+      })()}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          SEÇÃO 3 — RECORRENTES
       ══════════════════════════════════════════════════════════════════ */}
       <View style={s.section}>
 
@@ -1103,6 +1477,17 @@ function makeStyles(C: ColorPalette) {
     },
     emptySectionSub: {
       fontSize: 12, color: C.textLight, textAlign: 'center', lineHeight: 18,
+    },
+
+    // ── Orçamento ────────────────────────────────────────────────────────
+    orcItem: {
+      backgroundColor: C.bg, borderRadius: 12,
+      padding: SPACE.md, marginBottom: 8,
+      borderWidth: 0.5, borderColor: C.borderLight,
+    },
+    statMini: {
+      flex: 1, borderRadius: 12, padding: 12,
+      alignItems: 'center' as const,
     },
 
     // ── Categorias chips ────────────────────────────────────────────────
