@@ -49,6 +49,9 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, categoriasCu
   const { C } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
 
+  // Sub-aba interna
+  const [abaPlano, setAbaPlano] = useState<'contas' | 'planejamento' | 'recorrentes'>('contas');
+
   // Formulários colapsáveis
   const [showMetaForm,  setShowMetaForm]  = useState(false);
   const [showRecForm,   setShowRecForm]   = useState(false);
@@ -446,6 +449,31 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, categoriasCu
         </View>
       </View>
 
+      {/* ── Tab bar interno ── */}
+      <View style={s.abaRow}>
+        {(['contas', 'planejamento', 'recorrentes'] as const).map(a => {
+          const labels: Record<string, string> = {
+            contas: '🏦 Contas',
+            planejamento: '🎯 Planejamento',
+            recorrentes: '🔄 Recorrentes',
+          };
+          return (
+            <TouchableOpacity
+              key={a}
+              style={[s.abaBtn, abaPlano === a && s.abaBtnActive]}
+              onPress={() => setAbaPlano(a)}
+            >
+              <Text style={[s.abaBtnText, abaPlano === a && s.abaBtnTextActive]}>
+                {labels[a]}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* ════════════════ ABA: CONTAS ════════════════ */}
+      {abaPlano === 'contas' && <>
+
       {/* ══════════════════════════════════════════════════════════════════
           SEÇÃO 0 — CONTAS
       ══════════════════════════════════════════════════════════════════ */}
@@ -783,6 +811,11 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, categoriasCu
           </View>
         )}
       </View>
+
+      </>}{/* fim aba contas */}
+
+      {/* ════════════════ ABA: PLANEJAMENTO ════════════════ */}
+      {abaPlano === 'planejamento' && <>
 
       {/* ══════════════════════════════════════════════════════════════════
           SEÇÃO 1 — METAS DO MÊS
@@ -1197,6 +1230,11 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, categoriasCu
         );
       })()}
 
+      </>}{/* fim aba planejamento */}
+
+      {/* ════════════════ ABA: RECORRENTES ════════════════ */}
+      {abaPlano === 'recorrentes' && <>
+
       {/* ══════════════════════════════════════════════════════════════════
           SEÇÃO 3 — RECORRENTES
       ══════════════════════════════════════════════════════════════════ */}
@@ -1413,6 +1451,8 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, categoriasCu
         </TouchableOpacity>
       </View>
 
+      </>}{/* fim aba recorrentes */}
+
       <View style={{ height: 100 }} />
     </ScrollView>
   );
@@ -1431,6 +1471,38 @@ function makeStyles(C: ColorPalette) {
       width: 40, height: 40, borderRadius: 12,
       backgroundColor: C.brandBg,
       alignItems: 'center', justifyContent: 'center',
+    },
+
+    // ── Tab bar interno ─────────────────────────────────────────────────
+    abaRow: {
+      flexDirection: 'row',
+      marginHorizontal: 16,
+      marginBottom: 14,
+      backgroundColor: C.bgAccent,
+      borderRadius: RADIUS.full,
+      padding: 3,
+    },
+    abaBtn: {
+      flex: 1,
+      paddingVertical: 8,
+      borderRadius: RADIUS.full,
+      alignItems: 'center',
+    },
+    abaBtnActive: {
+      backgroundColor: C.bgCard,
+      shadowColor: '#000',
+      shadowOpacity: 0.08,
+      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 2,
+    },
+    abaBtnText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: C.textLight,
+    },
+    abaBtnTextActive: {
+      color: C.text,
     },
 
     // ── Seções ──────────────────────────────────────────────────────────
