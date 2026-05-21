@@ -17,17 +17,18 @@ import {
 } from 'lucide-react-native';
 import { MesSeletor } from '../components/MesSeletor';
 import { AppInput } from '../components/AppInput';
-import { CATEGORIAS, MESES, CORES_CAT } from '../constants';
+import { CATEGORIAS, MESES, CORES_CAT, CONTA_TIPOS } from '../constants';
 import { CatIcon } from '../constants/catIcons';
 import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, fmtSaldo, saudacao, confirmar } from '../utils/format';
 import { useBreakpoint } from '../hooks/useBreakpoint';
-import type { Transacao, Meta, Tipo } from '../types';
+import type { Transacao, Meta, Tipo, Conta } from '../types';
 import { RADIUS, SHADOW, SPACE, TYPE } from '../theme/tokens';
 
 type Props = {
   transacoes: Transacao[];
   metas: Meta[];
+  contas: Conta[];
   setTransacoes: React.Dispatch<React.SetStateAction<Transacao[]>>;
   calcularAlertas: (txs: Transacao[], mts: Meta[]) => void;
   mostrarToast: (msg: string) => void;
@@ -37,7 +38,7 @@ type Props = {
   navMes: (delta: number) => void;
 };
 
-export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAlertas, mostrarToast, carregando, mesSel, anoSel, navMes }: Props) {
+export function TelaLancamentos({ transacoes, metas, contas, setTransacoes, calcularAlertas, mostrarToast, carregando, mesSel, anoSel, navMes }: Props) {
   const hoje = new Date();
   const { heroFontSize, statCardWidth, isMobile, isDesktop, showRightPanel, rightPanelWidth } = useBreakpoint();
   const { C } = useTheme();
@@ -68,6 +69,13 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
   // Data do lançamento
   const [dataLanc, setDataLanc]         = useState(hoje.toLocaleDateString('pt-BR'));
   const [editDataLanc, setEditDataLanc] = useState('');
+
+  // Conta vinculada (null = sem conta)
+  const [contaId,     setContaId]     = useState<string | null>(null);
+  const [editContaId, setEditContaId] = useState<string | null>(null);
+
+  // Filtro por conta
+  const [filtroContaId, setFiltroContaId] = useState<string | null>(null);
 
   // Hover (desktop)
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -109,7 +117,8 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
       const noMes = p && parseInt(p[1]) - 1 === filtroMes && parseInt(p[2]) === filtroAno;
       const matchTipo = filtro === 'todas' || t.tipo === filtro;
       const matchBusca = !busca || t.descricao.toLowerCase().includes(busca.toLowerCase()) || t.categoria.toLowerCase().includes(busca.toLowerCase());
-      return noMes && matchTipo && matchBusca;
+      const matchConta = !filtroContaId || t.conta_id === filtroContaId;
+      return noMes && matchTipo && matchBusca && matchConta;
     });
 
     const txAgrupadas = visiveis.reduce((acc, t) => {
@@ -125,7 +134,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
     });
 
     return { txFiltroMes, recFiltroMes, despFiltroMes, saldoFiltroMes, filtroMesAntIdx, pctRec, pctDesp, maiorCat, catsFiltro, visiveis, txAgrupadas, datasOrdenadas };
-  }, [transacoes, filtroMes, filtroAno, filtro, busca]);
+  }, [transacoes, filtroMes, filtroAno, filtro, busca, filtroContaId]);
 
   const { txFiltroMes, recFiltroMes, despFiltroMes, saldoFiltroMes, filtroMesAntIdx, pctRec, pctDesp, maiorCat, catsFiltro, visiveis, txAgrupadas, datasOrdenadas } = dados;
 
@@ -146,14 +155,13 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
     if (!desc.trim() || isNaN(v) || v <= 0 || !validarDataLanc(dataLanc)) { mostrarToast('⚠️ Preencha todos os campos corretamente.'); return; }
     setSalvando(true);
     try {
-      const { data, error } = await supabase.from('transacoes').insert({
-        descricao: desc.trim(), valor: v, tipo, categoria: cat,
-        data: dataLanc,
-      }).select();
+      const payload: any = { descricao: desc.trim(), valor: v, tipo, categoria: cat, data: dataLanc };
+      if (contaId) payload.conta_id = contaId;
+      const { data, error } = await supabase.from('transacoes').insert(payload).select();
       if (error) throw error;
       const novas = [data[0], ...transacoes];
       setTransacoes(novas);
-      setDesc(''); setVal(''); setDataLanc(hoje.toLocaleDateString('pt-BR'));
+      setDesc(''); setVal(''); setDataLanc(hoje.toLocaleDateString('pt-BR')); setContaId(null);
       calcularAlertas(novas, metas);
       setShowFormModal(false);
       mostrarToast('✅ Lançamento adicionado!');
@@ -182,6 +190,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
     setEditTipo(t.tipo);
     setEditCat(t.categoria);
     setEditDataLanc(t.data);
+    setEditContaId(t.conta_id ?? null);
   }
 
   async function salvarEdicao() {
@@ -190,8 +199,9 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
     if (!editDesc.trim() || isNaN(v) || v <= 0 || !validarDataLanc(editDataLanc)) { mostrarToast('⚠️ Preencha todos os campos corretamente.'); return; }
     setSalvandoEdit(true);
     try {
+      const updPayload: any = { descricao: editDesc.trim(), valor: v, tipo: editTipo, categoria: editCat, data: editDataLanc, conta_id: editContaId ?? null };
       const { data, error } = await supabase.from('transacoes')
-        .update({ descricao: editDesc.trim(), valor: v, tipo: editTipo, categoria: editCat, data: editDataLanc })
+        .update(updPayload)
         .eq('id', txEditando.id).select();
       if (error) throw error;
       const novas = transacoes.map(t => t.id === txEditando.id ? data[0] : t);
@@ -249,7 +259,18 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
         </View>
         <View style={s.txInfo}>
           <Text style={s.txDesc}>{t.descricao}</Text>
-          <Text style={s.txMeta}>{t.categoria}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={s.txMeta}>{t.categoria}</Text>
+            {t.conta_id && (() => {
+              const c = contas.find(c => c.id === t.conta_id);
+              return c ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.cor }} />
+                  <Text style={[s.txMeta, { color: c.cor, fontSize: 11 }]}>{c.nome}</Text>
+                </View>
+              ) : null;
+            })()}
+          </View>
         </View>
         <Text style={[s.txValor, { color: t.tipo === 'receita' ? C.receita : C.despesa }]}>
           {t.tipo === 'receita' ? '+' : '-'} {fmt(t.valor)}
@@ -308,6 +329,26 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+              {contas.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[s.catScroll, { marginBottom: 12 }]}>
+                  <TouchableOpacity
+                    style={[s.catBtn, !editContaId && { backgroundColor: C.bgAccent, borderColor: C.border }]}
+                    onPress={() => setEditContaId(null)}
+                  >
+                    <Text style={[s.catBtnText, !editContaId && { color: C.label }]}>Sem conta</Text>
+                  </TouchableOpacity>
+                  {contas.map(c => (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[s.catBtn, editContaId === c.id && { backgroundColor: c.cor + '33', borderColor: c.cor }]}
+                      onPress={() => setEditContaId(c.id)}
+                    >
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.cor, marginRight: 4 }} />
+                      <Text style={[s.catBtnText, editContaId === c.id && { color: c.cor, fontWeight: '600' }]}>{c.nome}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
                 <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: C.bgAccent }]} onPress={() => setTxEditando(null)}>
                   <Text style={[s.btnText, { color: C.primaryDark }]}>Cancelar</Text>
@@ -360,6 +401,26 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+              {contas.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[s.catScroll, { marginBottom: 12 }]}>
+                  <TouchableOpacity
+                    style={[s.catBtn, !contaId && { backgroundColor: C.bgAccent, borderColor: C.border }]}
+                    onPress={() => setContaId(null)}
+                  >
+                    <Text style={[s.catBtnText, !contaId && { color: C.label }]}>Sem conta</Text>
+                  </TouchableOpacity>
+                  {contas.map(c => (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[s.catBtn, contaId === c.id && { backgroundColor: c.cor + '33', borderColor: c.cor }]}
+                      onPress={() => setContaId(c.id)}
+                    >
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.cor, marginRight: 4 }} />
+                      <Text style={[s.catBtnText, contaId === c.id && { color: c.cor, fontWeight: '600' }]}>{c.nome}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
                 <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: C.bgAccent }]} onPress={() => { setShowFormModal(false); setDesc(''); setVal(''); setDataLanc(hoje.toLocaleDateString('pt-BR')); }}>
                   <Text style={[s.btnText, { color: C.primaryDark }]}>Cancelar</Text>
@@ -504,7 +565,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
               </TouchableOpacity>
             </View>
 
-            {/* Filtros */}
+            {/* Filtros — tipo */}
             <View style={[s.filtros, { paddingTop: 0 }]}>
               {(['todas', 'receita', 'despesa'] as const).map(f => (
                 <TouchableOpacity key={f} style={[s.filtroBtn, filtro === f && { backgroundColor: C.brand, borderColor: C.brand }]} onPress={() => setFiltro(f)}>
@@ -514,6 +575,28 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
                 </TouchableOpacity>
               ))}
             </View>
+
+            {/* Filtros — conta (só quando há contas cadastradas) */}
+            {contas.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[s.filtros, { paddingTop: 0, marginTop: -4 }]}>
+                <TouchableOpacity
+                  style={[s.filtroBtn, !filtroContaId && { backgroundColor: C.bgAccent, borderColor: C.border }]}
+                  onPress={() => setFiltroContaId(null)}
+                >
+                  <Text style={[s.filtroBtnText, !filtroContaId && { color: C.text }]}>Todas as contas</Text>
+                </TouchableOpacity>
+                {contas.map(c => (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={[s.filtroBtn, filtroContaId === c.id && { backgroundColor: c.cor + '33', borderColor: c.cor }]}
+                    onPress={() => setFiltroContaId(filtroContaId === c.id ? null : c.id)}
+                  >
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.cor, marginRight: 4 }} />
+                    <Text style={[s.filtroBtnText, filtroContaId === c.id && { color: c.cor, fontWeight: '600' }]}>{c.nome}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
 
             {/* Lista */}
             {carregando ? (

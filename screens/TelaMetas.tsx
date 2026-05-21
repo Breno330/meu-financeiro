@@ -19,24 +19,26 @@ import {
   TrendingUp, TrendingDown,
 } from 'lucide-react-native';
 import { supabase } from '../supabase';
-import { CATEGORIAS, MESES } from '../constants';
+import { CATEGORIAS, MESES, CONTA_TIPOS, CONTA_CORES } from '../constants';
 import { CatIcon } from '../constants/catIcons';
 import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, confirmar } from '../utils/format';
-import type { Transacao, Meta, Recorrente, Tipo } from '../types';
+import type { Transacao, Meta, Recorrente, Tipo, Conta } from '../types';
 import { RADIUS, SHADOW, SPACE, TYPE } from '../theme/tokens';
 
 type Props = {
   transacoes: Transacao[];
   metas: Meta[];
   recorrentes: Recorrente[];
+  contas: Conta[];
   setMetas: React.Dispatch<React.SetStateAction<Meta[]>>;
   setRecorrentes: React.Dispatch<React.SetStateAction<Recorrente[]>>;
+  setContas: React.Dispatch<React.SetStateAction<Conta[]>>;
   calcularAlertas: (txs: Transacao[], mts: Meta[]) => void;
   mostrarToast: (msg: string) => void;
 };
 
-export function TelaMetas({ transacoes, metas, recorrentes, setMetas, setRecorrentes, calcularAlertas, mostrarToast }: Props) {
+export function TelaMetas({ transacoes, metas, recorrentes, contas, setMetas, setRecorrentes, setContas, calcularAlertas, mostrarToast }: Props) {
   const hoje = new Date();
   const { C } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
@@ -44,6 +46,14 @@ export function TelaMetas({ transacoes, metas, recorrentes, setMetas, setRecorre
   // Formulários colapsáveis
   const [showMetaForm, setShowMetaForm]   = useState(false);
   const [showRecForm,  setShowRecForm]    = useState(false);
+  const [showContaForm, setShowContaForm] = useState(false);
+
+  // Conta form
+  const [contaNome,   setContaNome]   = useState('');
+  const [contaTipo,   setContaTipo]   = useState('corrente');
+  const [contaSaldo,  setContaSaldo]  = useState('');
+  const [contaCor,    setContaCor]    = useState(CONTA_CORES[0]);
+  const [salvandoConta, setSalvandoConta] = useState(false);
 
   // Meta form
   const [metaTipo, setMetaTipo] = useState<'saldo' | 'categoria'>('saldo');
@@ -70,6 +80,50 @@ export function TelaMetas({ transacoes, metas, recorrentes, setMetas, setRecorre
   function toggleRec() {
     LayoutAnimation.configureNext(LAYOUT_ANIM);
     setShowRecForm(v => !v);
+  }
+
+  function toggleConta() {
+    LayoutAnimation.configureNext(LAYOUT_ANIM);
+    setShowContaForm(v => !v);
+  }
+
+  // ── Saldo calculado por conta ───────────────────────────────────────────
+  function saldoConta(c: Conta): number {
+    const txConta = transacoes.filter(t => t.conta_id === c.id);
+    const rec  = txConta.filter(t => t.tipo === 'receita').reduce((s, t) => s + Number(t.valor), 0);
+    const desp = txConta.filter(t => t.tipo === 'despesa').reduce((s, t) => s + Number(t.valor), 0);
+    return c.saldo_inicial + rec - desp;
+  }
+
+  async function adicionarConta() {
+    if (!contaNome.trim()) { mostrarToast('Informe o nome da conta.'); return; }
+    const si = parseFloat(contaSaldo.replace(/\./g, '').replace(',', '.')) || 0;
+    setSalvandoConta(true);
+    try {
+      const { data, error } = await supabase.from('contas').insert({
+        nome: contaNome.trim(), tipo: contaTipo,
+        saldo_inicial: si, cor: contaCor, ativo: true,
+      }).select();
+      if (error) throw error;
+      setContas([...contas, data[0]]);
+      setContaNome(''); setContaSaldo(''); setContaCor(CONTA_CORES[0]); setContaTipo('corrente');
+      LayoutAnimation.configureNext(LAYOUT_ANIM);
+      setShowContaForm(false);
+      mostrarToast('Conta criada!');
+    } catch (err: any) {
+      mostrarToast(`Erro ao salvar conta: ${err.message ?? 'tente novamente'}`);
+    } finally {
+      setSalvandoConta(false);
+    }
+  }
+
+  async function removerConta(id: string) {
+    confirmar('Remover conta', 'A conta será removida. Os lançamentos vinculados não serão apagados.', async () => {
+      const { error } = await supabase.from('contas').update({ ativo: false }).eq('id', id);
+      if (error) { mostrarToast(`Erro: ${error.message}`); return; }
+      setContas(contas.filter(c => c.id !== id));
+      mostrarToast('Conta removida.');
+    });
   }
 
   // ── Dados do mês atual ──────────────────────────────────────────────────
@@ -209,6 +263,145 @@ export function TelaMetas({ transacoes, metas, recorrentes, setMetas, setRecorre
         <View style={s.headerIcon}>
           <Target size={20} color={C.brand} strokeWidth={2} />
         </View>
+      </View>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          SEÇÃO 0 — CONTAS
+      ══════════════════════════════════════════════════════════════════ */}
+      <View style={s.section}>
+
+        {/* Cabeçalho */}
+        <View style={s.sectionHeader}>
+          <View>
+            <Text style={s.sectionTitle}>Minhas contas</Text>
+            <Text style={s.sectionSub}>
+              {contas.length === 0
+                ? 'Nenhuma conta cadastrada'
+                : `${contas.length} conta${contas.length > 1 ? 's' : ''} · saldo total ${fmt(contas.reduce((acc, c) => acc + saldoConta(c), 0))}`
+              }
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[s.addBtn, showContaForm && s.addBtnActive]}
+            onPress={toggleConta}
+          >
+            {showContaForm
+              ? <ChevronUp size={14} color={C.primaryDark} strokeWidth={2.5} />
+              : <Plus      size={14} color={C.primaryDark} strokeWidth={2.5} />
+            }
+            <Text style={s.addBtnText}>{showContaForm ? 'Cancelar' : 'Nova conta'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Lista de contas */}
+        {contas.length === 0 && !showContaForm && (
+          <View style={s.emptySection}>
+            <View style={s.emptySectionIcon}>
+              <Wallet size={24} color={C.textLight} strokeWidth={1.5} />
+            </View>
+            <Text style={s.emptySectionTitle}>Sem contas cadastradas</Text>
+            <Text style={s.emptySectionSub}>Adicione suas contas bancárias, poupança ou carteira para controlar seu saldo real.</Text>
+          </View>
+        )}
+
+        {contas.map(c => {
+          const saldo = saldoConta(c);
+          const tipoInfo = CONTA_TIPOS.find(t => t.key === c.tipo);
+          return (
+            <View key={c.id} style={[s.recItem, { borderLeftWidth: 3, borderLeftColor: c.cor }]}>
+              {/* Ícone colorido */}
+              <View style={[s.recIcone, { backgroundColor: c.cor + '22' }]}>
+                <Text style={{ fontSize: 18 }}>{tipoInfo?.icone ?? '🏦'}</Text>
+              </View>
+
+              {/* Info */}
+              <View style={{ flex: 1 }}>
+                <Text style={s.recDesc}>{c.nome}</Text>
+                <Text style={s.recMeta}>{tipoInfo?.label ?? c.tipo}</Text>
+              </View>
+
+              {/* Saldo */}
+              <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                <Text style={[s.recValor, { color: saldo >= 0 ? C.receita : C.despesa }]}>
+                  {fmt(saldo)}
+                </Text>
+                <TouchableOpacity onPress={() => removerConta(c.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Trash2 size={14} color={C.textLight} strokeWidth={1.8} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })}
+
+        {/* Formulário colapsável — nova conta */}
+        {showContaForm && (
+          <View style={s.inlineForm}>
+            <View style={s.formDivider} />
+
+            {/* Nome */}
+            <Text style={s.formFieldLabel}>Nome da conta</Text>
+            <TextInput
+              style={s.input}
+              placeholder="Ex: Nubank, Poupança Caixa…"
+              placeholderTextColor={C.textLight}
+              value={contaNome}
+              onChangeText={setContaNome}
+            />
+
+            {/* Tipo */}
+            <Text style={s.formFieldLabel}>Tipo</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.catScroll}>
+              {CONTA_TIPOS.map(t => (
+                <TouchableOpacity
+                  key={t.key}
+                  style={[s.catBtn, contaTipo === t.key && { backgroundColor: C.brand, borderColor: C.brand }]}
+                  onPress={() => setContaTipo(t.key)}
+                >
+                  <Text style={{ fontSize: 12 }}>{t.icone}</Text>
+                  <Text style={[s.catBtnText, contaTipo === t.key && { color: C.primaryDark }]}>{t.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Saldo inicial */}
+            <Text style={s.formFieldLabel}>Saldo inicial (R$)</Text>
+            <TextInput
+              style={s.input}
+              placeholder="0,00"
+              placeholderTextColor={C.textLight}
+              keyboardType="numeric"
+              value={contaSaldo}
+              onChangeText={setContaSaldo}
+            />
+
+            {/* Cor */}
+            <Text style={s.formFieldLabel}>Cor</Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+              {CONTA_CORES.map(cor => (
+                <TouchableOpacity
+                  key={cor}
+                  onPress={() => setContaCor(cor)}
+                  style={{
+                    width: 28, height: 28, borderRadius: 14,
+                    backgroundColor: cor,
+                    borderWidth: contaCor === cor ? 3 : 0,
+                    borderColor: C.text,
+                    transform: [{ scale: contaCor === cor ? 1.15 : 1 }],
+                  }}
+                />
+              ))}
+            </View>
+
+            {/* Botão salvar */}
+            <TouchableOpacity
+              style={[s.ctaBtn, { opacity: salvandoConta ? 0.6 : 1 }]}
+              onPress={adicionarConta}
+              disabled={salvandoConta}
+            >
+              <Text style={s.ctaBtnText}>{salvandoConta ? 'Salvando…' : 'Salvar conta'}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* ══════════════════════════════════════════════════════════════════

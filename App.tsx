@@ -16,7 +16,7 @@ import { ThemeProvider, useTheme, type ColorPalette } from './contexts/ThemeCont
 import { useToast } from './hooks/useToast';
 import { useBreakpoint } from './hooks/useBreakpoint';
 import { T } from './components/T';
-import type { Transacao, Meta, Recorrente, Aba } from './types';
+import type { Transacao, Meta, Recorrente, Aba, Conta } from './types';
 import { RADIUS, SPACE } from './theme/tokens';
 
 import { TelaLogin } from './screens/TelaLogin';
@@ -67,6 +67,7 @@ function AppInner() {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [metas, setMetas] = useState<Meta[]>([]);
   const [recorrentes, setRecorrentes] = useState<Recorrente[]>([]);
+  const [contas, setContas] = useState<Conta[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [alertas, setAlertas] = useState<string[]>([]);
   const [showAlertas, setShowAlertas] = useState(false);
@@ -117,15 +118,18 @@ function AppInner() {
   async function carregarTudo() {
     setCarregando(true);
     try {
-      const [r1, r2, r3] = await Promise.all([
+      const [r1, r2, r3, r4] = await Promise.all([
         supabase.from('transacoes').select('*').order('criado_em', { ascending: false }),
         supabase.from('metas').select('*'),
         supabase.from('recorrentes').select('*').eq('ativo', true),
+        supabase.from('contas').select('*').eq('ativo', true).order('criado_em', { ascending: true }),
       ]);
 
       if (r1.error) throw new Error(`Transações: ${r1.error.message}`);
       if (r2.error) throw new Error(`Metas: ${r2.error.message}`);
       if (r3.error) throw new Error(`Recorrentes: ${r3.error.message}`);
+      // contas: falha silenciosa se tabela ainda não existe
+      if (!r4.error) setContas(r4.data || []);
 
       let todasTx: Transacao[] = r1.data || [];
       const todasMetas: Meta[] = r2.data || [];
@@ -320,7 +324,7 @@ function AppInner() {
           <Animated.View style={{ flex: 1, opacity: screenAnim }}>
             {aba === 'lancamentos' && (
               <TelaLancamentos
-                transacoes={transacoes} metas={metas}
+                transacoes={transacoes} metas={metas} contas={contas}
                 setTransacoes={setTransacoes} calcularAlertas={calcularAlertas}
                 mostrarToast={mostrarToast} carregando={carregando}
                 mesSel={mesSel} anoSel={anoSel} navMes={navMes}
@@ -336,6 +340,7 @@ function AppInner() {
             {aba === 'metas' && (
               <TelaMetas
                 transacoes={transacoes} metas={metas} recorrentes={recorrentes}
+                contas={contas} setContas={setContas}
                 setMetas={setMetas} setRecorrentes={setRecorrentes}
                 calcularAlertas={calcularAlertas} mostrarToast={mostrarToast}
               />

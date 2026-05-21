@@ -1,5 +1,15 @@
 export type Tipo = 'receita' | 'despesa';
 export type Aba = 'lancamentos' | 'resumo' | 'metas' | 'importar';
+export type ContaTipo = 'corrente' | 'poupanca' | 'carteira' | 'investimento';
+
+export type Conta = {
+  id: string;
+  nome: string;
+  tipo: ContaTipo;
+  saldo_inicial: number;
+  cor: string;
+  ativo: boolean;
+};
 
 export type Transacao = {
   id: string;
@@ -8,6 +18,7 @@ export type Transacao = {
   tipo: Tipo;
   categoria: string;
   data: string;
+  conta_id?: string | null;
   criado_em?: string;
 };
 
