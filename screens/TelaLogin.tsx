@@ -6,6 +6,7 @@ import {
 import { T as Text } from '../components/T';
 import { supabase } from '../supabase';
 import { useTheme } from '../contexts/ThemeContext';
+import { useBreakpoint } from '../hooks/useBreakpoint';
 import { TrendingUp, Target, Lock } from 'lucide-react-native';
 
 export function TelaLogin() {
@@ -14,6 +15,7 @@ export function TelaLogin() {
   const [modo, setModo] = useState<'login' | 'cadastro'>('login');
   const [carregando, setCarregando] = useState(false);
   const { C } = useTheme();
+  const { isMobile } = useBreakpoint();
 
   async function entrar() {
     if (!email.trim() || !senha) { Alert.alert('Preencha todos os campos'); return; }
@@ -44,7 +46,7 @@ export function TelaLogin() {
     accentMid: C.border, text: C.text, label: C.label, highlight: C.brand,
   };
 
-  if (Platform.OS === 'web') {
+  if (Platform.OS === 'web' && !isMobile) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: LP.bg }}>
         <View style={{ flex: 1, flexDirection: 'row' }}>

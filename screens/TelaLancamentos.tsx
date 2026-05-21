@@ -409,7 +409,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
           <Text style={s.greeting}>{saudacao()}</Text>
           <Text style={s.pageTitle}>Minhas Finanças</Text>
         </View>
-        {Platform.OS !== 'web' && (
+        {(Platform.OS !== 'web' || isMobile) && (
           <TouchableOpacity style={s.avatar} onPress={() => supabase.auth.signOut()}>
             <Text style={s.avatarText}>↩</Text>
           </TouchableOpacity>
