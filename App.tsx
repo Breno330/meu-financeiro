@@ -10,7 +10,7 @@ import {
   Inter_400Regular, Inter_500Medium,
   Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold,
 } from '@expo-google-fonts/inter';
-import { Home, BarChart2, Target, Download, LogOut, Sun, Moon } from 'lucide-react-native';
+import { Home, BarChart2, Target, Download, LogOut, Sun, Moon, AlertTriangle } from 'lucide-react-native';
 
 import { ThemeProvider, useTheme, type ColorPalette } from './contexts/ThemeContext';
 import { useToast } from './hooks/useToast';
@@ -69,6 +69,20 @@ function AppInner() {
   const [carregando, setCarregando] = useState(true);
   const [alertas, setAlertas] = useState<string[]>([]);
   const [showAlertas, setShowAlertas] = useState(false);
+
+  // ── Mês/ano compartilhado entre Lançamentos e Resumo ───────────────────────
+  const [mesSel, setMesSel] = useState(hoje.getMonth());
+  const [anoSel, setAnoSel]  = useState(hoje.getFullYear());
+
+  function navMes(delta: number) {
+    if (delta < 0) {
+      if (mesSel === 0) { setMesSel(11); setAnoSel(a => a - 1); }
+      else setMesSel(m => m - 1);
+    } else {
+      if (mesSel === 11) { setMesSel(0); setAnoSel(a => a + 1); }
+      else setMesSel(m => m + 1);
+    }
+  }
 
   // ── UI ──────────────────────────────────────────────────────────────────────
   const [aba, setAba] = useState<Aba>('lancamentos');
@@ -294,8 +308,9 @@ function AppInner() {
 
           {/* Alertas */}
           {alertas.length > 0 && (
-            <TouchableOpacity style={s.alertaBanner} onPress={() => setShowAlertas(!showAlertas)}>
-              <T style={s.alertaBannerText}>🚨 {alertas.length} alerta{alertas.length > 1 ? 's' : ''} — toque para ver</T>
+            <TouchableOpacity style={[s.alertaBanner, { flexDirection: 'row', alignItems: 'center', gap: 8 }]} onPress={() => setShowAlertas(!showAlertas)}>
+              <AlertTriangle size={14} color="#fff" strokeWidth={2} />
+              <T style={s.alertaBannerText}>{alertas.length} alerta{alertas.length > 1 ? 's' : ''} — toque para ver</T>
             </TouchableOpacity>
           )}
           {showAlertas && alertas.map((a, i) => <T key={i} style={s.alertaItem}>{a}</T>)}
@@ -307,10 +322,15 @@ function AppInner() {
                 transacoes={transacoes} metas={metas}
                 setTransacoes={setTransacoes} calcularAlertas={calcularAlertas}
                 mostrarToast={mostrarToast} carregando={carregando}
+                mesSel={mesSel} anoSel={anoSel} navMes={navMes}
               />
             )}
             {aba === 'resumo' && (
-              <TelaResumo transacoes={transacoes} metas={metas} />
+              <TelaResumo
+                transacoes={transacoes} metas={metas}
+                carregando={carregando}
+                mesSel={mesSel} anoSel={anoSel} navMes={navMes}
+              />
             )}
             {aba === 'metas' && (
               <TelaMetas

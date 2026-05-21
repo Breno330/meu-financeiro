@@ -16,6 +16,7 @@ import {
   Table2, CheckCircle, AlertTriangle, Plus,
 } from 'lucide-react-native';
 import { MesSeletor } from '../components/MesSeletor';
+import { AppInput } from '../components/AppInput';
 import { CATEGORIAS, MESES, CORES_CAT } from '../constants';
 import { CatIcon } from '../constants/catIcons';
 import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
@@ -30,17 +31,20 @@ type Props = {
   calcularAlertas: (txs: Transacao[], mts: Meta[]) => void;
   mostrarToast: (msg: string) => void;
   carregando: boolean;
+  mesSel: number;
+  anoSel: number;
+  navMes: (delta: number) => void;
 };
 
-export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAlertas, mostrarToast, carregando }: Props) {
+export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAlertas, mostrarToast, carregando, mesSel, anoSel, navMes }: Props) {
   const hoje = new Date();
   const { heroFontSize, statCardWidth, isDesktop, showRightPanel, rightPanelWidth } = useBreakpoint();
   const { C } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
 
-  // Filtros
-  const [filtroMes, setFiltroMes] = useState(hoje.getMonth());
-  const [filtroAno, setFiltroAno] = useState(hoje.getFullYear());
+  // Filtros — mês/ano vêm de props (compartilhado com TelaResumo via App.tsx)
+  const filtroMes = mesSel;
+  const filtroAno = anoSel;
   const [filtro, setFiltro] = useState<'todas' | Tipo>('todas');
   const [busca, setBusca] = useState('');
 
@@ -59,6 +63,10 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
   const [editTipo, setEditTipo] = useState<Tipo>('despesa');
   const [editCat, setEditCat] = useState('Alimentação');
   const [salvandoEdit, setSalvandoEdit] = useState(false);
+
+  // Data do lançamento
+  const [dataLanc, setDataLanc]         = useState(hoje.toLocaleDateString('pt-BR'));
+  const [editDataLanc, setEditDataLanc] = useState('');
 
   // Hover (desktop)
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -132,29 +140,19 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
     return dataStr;
   }, [hoje]);
 
-  function navMes(delta: number) {
-    if (delta < 0) {
-      if (filtroMes === 0) { setFiltroMes(11); setFiltroAno(a => a - 1); }
-      else setFiltroMes(m => m - 1);
-    } else {
-      if (filtroMes === 11) { setFiltroMes(0); setFiltroAno(a => a + 1); }
-      else setFiltroMes(m => m + 1);
-    }
-  }
-
   async function adicionar() {
     const v = parseFloat(val.replace(/\./g, '').replace(',', '.'));
-    if (!desc.trim() || isNaN(v) || v <= 0) { mostrarToast('⚠️ Preencha descrição e valor corretamente.'); return; }
+    if (!desc.trim() || isNaN(v) || v <= 0 || !validarDataLanc(dataLanc)) { mostrarToast('⚠️ Preencha todos os campos corretamente.'); return; }
     setSalvando(true);
     try {
       const { data, error } = await supabase.from('transacoes').insert({
         descricao: desc.trim(), valor: v, tipo, categoria: cat,
-        data: hoje.toLocaleDateString('pt-BR'),
+        data: dataLanc,
       }).select();
       if (error) throw error;
       const novas = [data[0], ...transacoes];
       setTransacoes(novas);
-      setDesc(''); setVal('');
+      setDesc(''); setVal(''); setDataLanc(hoje.toLocaleDateString('pt-BR'));
       calcularAlertas(novas, metas);
       setShowFormModal(false);
       mostrarToast('✅ Lançamento adicionado!');
@@ -182,16 +180,17 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
     setEditVal(String(t.valor).replace('.', ','));
     setEditTipo(t.tipo);
     setEditCat(t.categoria);
+    setEditDataLanc(t.data);
   }
 
   async function salvarEdicao() {
     if (!txEditando) return;
     const v = parseFloat(editVal.replace(/\./g, '').replace(',', '.'));
-    if (!editDesc.trim() || isNaN(v) || v <= 0) { mostrarToast('⚠️ Preencha descrição e valor corretamente.'); return; }
+    if (!editDesc.trim() || isNaN(v) || v <= 0 || !validarDataLanc(editDataLanc)) { mostrarToast('⚠️ Preencha todos os campos corretamente.'); return; }
     setSalvandoEdit(true);
     try {
       const { data, error } = await supabase.from('transacoes')
-        .update({ descricao: editDesc.trim(), valor: v, tipo: editTipo, categoria: editCat })
+        .update({ descricao: editDesc.trim(), valor: v, tipo: editTipo, categoria: editCat, data: editDataLanc })
         .eq('id', txEditando.id).select();
       if (error) throw error;
       const novas = transacoes.map(t => t.id === txEditando.id ? data[0] : t);
@@ -279,8 +278,17 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
                 <Pencil size={16} color={C.brand} strokeWidth={2} />
                 <Text style={s.modalTitulo}>Editar lançamento</Text>
               </View>
-              <TextInput style={s.input} placeholder="Descrição" placeholderTextColor={C.textLight} value={editDesc} onChangeText={setEditDesc}/>
-              <TextInput style={s.input} placeholder="Valor (ex: 2450,00)" placeholderTextColor={C.textLight} value={editVal} onChangeText={setEditVal} keyboardType="decimal-pad"/>
+              <AppInput style={s.input} placeholder="Descrição" placeholderTextColor={C.textLight} value={editDesc} onChangeText={setEditDesc}/>
+              <AppInput style={s.input} placeholder="Valor (ex: 2450,00)" placeholderTextColor={C.textLight} value={editVal} onChangeText={setEditVal} keyboardType="decimal-pad"/>
+              <AppInput
+                style={s.input}
+                placeholder="Data (DD/MM/AAAA)"
+                placeholderTextColor={C.textLight}
+                value={editDataLanc}
+                onChangeText={(t) => setEditDataLanc(fmtDataInput(t))}
+                keyboardType="decimal-pad"
+                maxLength={10}
+              />
               <View style={s.row}>
                 <TouchableOpacity style={[s.tipoBtn, editTipo === 'receita' && { backgroundColor: C.receita, borderColor: C.receita }]} onPress={() => setEditTipo('receita')}>
                   <Text style={[s.tipoBtnText, editTipo === 'receita' && { color: '#fff' }]}>Receita</Text>
@@ -322,8 +330,17 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
                 <Plus size={16} color={C.brand} strokeWidth={2} />
                 <Text style={s.modalTitulo}>Novo lançamento</Text>
               </View>
-              <TextInput style={s.input} placeholder="Descrição" placeholderTextColor={C.textLight} value={desc} onChangeText={setDesc}/>
-              <TextInput style={s.input} placeholder="Valor (ex: 2450,00)" placeholderTextColor={C.textLight} value={val} onChangeText={setVal} keyboardType="decimal-pad"/>
+              <AppInput style={s.input} placeholder="Descrição" placeholderTextColor={C.textLight} value={desc} onChangeText={setDesc}/>
+              <AppInput style={s.input} placeholder="Valor (ex: 2450,00)" placeholderTextColor={C.textLight} value={val} onChangeText={setVal} keyboardType="decimal-pad"/>
+              <AppInput
+                style={s.input}
+                placeholder="Data (DD/MM/AAAA)"
+                placeholderTextColor={C.textLight}
+                value={dataLanc}
+                onChangeText={(t) => setDataLanc(fmtDataInput(t))}
+                keyboardType="decimal-pad"
+                maxLength={10}
+              />
               <View style={s.row}>
                 <TouchableOpacity style={[s.tipoBtn, tipo === 'receita' && { backgroundColor: C.receita, borderColor: C.receita }]} onPress={() => setTipo('receita')}>
                   <Text style={[s.tipoBtnText, tipo === 'receita' && { color: '#fff' }]}>↑ Receita</Text>
@@ -343,7 +360,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
                 ))}
               </ScrollView>
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-                <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: C.bgAccent }]} onPress={() => { setShowFormModal(false); setDesc(''); setVal(''); }}>
+                <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: C.bgAccent }]} onPress={() => { setShowFormModal(false); setDesc(''); setVal(''); setDataLanc(hoje.toLocaleDateString('pt-BR')); }}>
                   <Text style={[s.btnText, { color: C.primaryDark }]}>Cancelar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[s.btn, { flex: 2, backgroundColor: C.brand, opacity: salvando ? 0.6 : 1 }]} onPress={adicionar} disabled={salvando}>
@@ -736,6 +753,21 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
       </Animated.View>
     </>
   );
+}
+
+// ── Helpers de data ──────────────────────────────────────────────────────────
+function fmtDataInput(text: string): string {
+  const n = text.replace(/\D/g, '').slice(0, 8);
+  if (n.length <= 2) return n;
+  if (n.length <= 4) return `${n.slice(0,2)}/${n.slice(2)}`;
+  return `${n.slice(0,2)}/${n.slice(2,4)}/${n.slice(4)}`;
+}
+
+function validarDataLanc(d: string): boolean {
+  const p = d.split('/');
+  if (p.length !== 3 || p[2].length !== 4) return false;
+  const dia = parseInt(p[0]), mes = parseInt(p[1]), ano = parseInt(p[2]);
+  return dia >= 1 && dia <= 31 && mes >= 1 && mes <= 12 && ano >= 2000;
 }
 
 // ── Skeleton list — substitui ActivityIndicator durante carregamento ──────────

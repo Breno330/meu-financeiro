@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { T as Text } from '../components/T';
 import { HeroCard } from '../components/HeroCard';
@@ -13,17 +13,20 @@ import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, fmtSaldo } from '../utils/format';
 import { GraficoPizza } from '../components/GraficoPizza';
 import { useBreakpoint } from '../hooks/useBreakpoint';
+import { Skeleton } from '../components/Skeleton';
 import type { Transacao, Meta } from '../types';
 
 type Props = {
   transacoes: Transacao[];
   metas: Meta[];
+  carregando: boolean;
+  mesSel: number;
+  anoSel: number;
+  navMes: (delta: number) => void;
 };
 
-export function TelaResumo({ transacoes, metas }: Props) {
+export function TelaResumo({ transacoes, metas, carregando, mesSel, anoSel, navMes }: Props) {
   const hoje = new Date();
-  const [mesSel, setMesSel] = useState(hoje.getMonth());
-  const [anoSel, setAnoSel] = useState(hoje.getFullYear());
   const { heroFontSize, statCardWidth, isMobile } = useBreakpoint();
   const { C } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
@@ -105,16 +108,6 @@ export function TelaResumo({ transacoes, metas }: Props) {
     pctRecTotal, pctDespTotal, gastouPctAMais, insights,
   } = dados;
 
-  function navMes(delta: number) {
-    if (delta < 0) {
-      if (mesSel === 0) { setMesSel(11); setAnoSel(a => a - 1); }
-      else setMesSel(m => m - 1);
-    } else {
-      if (mesSel === 11) { setMesSel(0); setAnoSel(a => a + 1); }
-      else setMesSel(m => m + 1);
-    }
-  }
-
   return (
     <ScrollView style={{ flex: 1 }}>
 
@@ -186,7 +179,19 @@ export function TelaResumo({ transacoes, metas }: Props) {
       </View>
 
       {/* ── Linha 2: 4 cards de stats ── */}
-      {isMobile ? (
+      {carregando ? (
+        /* Skeleton durante carregamento */
+        <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 12 }}>
+          {[0,1,2,3].map(i => (
+            <View key={i} style={[s.statCard, { flex: 1 }]}>
+              <Skeleton width={32} height={32} radius={8} style={{ marginBottom: 8 }} />
+              <Skeleton width="60%" height={10} radius={4} style={{ marginBottom: 6 }} />
+              <Skeleton width="85%" height={15} radius={4} style={{ marginBottom: 4 }} />
+              <Skeleton width="45%" height={10} radius={4} />
+            </View>
+          ))}
+        </View>
+      ) : isMobile ? (
         /* Mobile: scroll horizontal com cards de largura fixa */
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, marginBottom: 12 }}>
           <View style={[s.statCard, { width: statCardWidth }]}>

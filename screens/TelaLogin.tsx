@@ -6,6 +6,7 @@ import {
 import { T as Text } from '../components/T';
 import { supabase } from '../supabase';
 import { useTheme } from '../contexts/ThemeContext';
+import { TrendingUp, Target, Lock } from 'lucide-react-native';
 
 export function TelaLogin() {
   const [email, setEmail] = useState('');
@@ -69,18 +70,18 @@ export function TelaLogin() {
               <Text style={{ fontSize: 15, color: LP.label, lineHeight: 26, marginBottom: 40, maxWidth: 380 }}>
                 Acompanhe receitas, despesas, metas e tenha clareza total sobre seu dinheiro.
               </Text>
-              {[
-                { icon: '📈', title: 'Visão completa', desc: 'Tenha controle de todas as suas finanças' },
-                { icon: '🎯', title: 'Metas inteligentes', desc: 'Defina objetivos e acompanhe seu progresso' },
-                { icon: '🔒', title: 'Seguro e privado', desc: 'Seus dados protegidos com segurança' },
-              ].map((f, i) => (
+              {([
+                { Icon: TrendingUp, title: 'Visão completa',    desc: 'Tenha controle de todas as suas finanças'   },
+                { Icon: Target,     title: 'Metas inteligentes', desc: 'Defina objetivos e acompanhe seu progresso' },
+                { Icon: Lock,       title: 'Seguro e privado',   desc: 'Seus dados protegidos com segurança'        },
+              ] as const).map(({ Icon, title, desc }, i) => (
                 <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 18 }}>
                   <View style={{ width: 44, height: 44, borderRadius: 13, backgroundColor: LP.accentLight, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontSize: 19 }}>{f.icon}</Text>
+                    <Icon size={20} color={LP.accent} strokeWidth={1.8} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: LP.text, marginBottom: 2 }}>{f.title}</Text>
-                    <Text style={{ fontSize: 12, color: LP.label }}>{f.desc}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: LP.text, marginBottom: 2 }}>{title}</Text>
+                    <Text style={{ fontSize: 12, color: LP.label }}>{desc}</Text>
                   </View>
                 </View>
               ))}
