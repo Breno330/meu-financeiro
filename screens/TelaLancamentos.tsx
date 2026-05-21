@@ -12,8 +12,9 @@ import { supabase } from '../supabase';
 import {
   ArrowUpRight, ArrowDownRight, Tag, TrendingUp, TrendingDown,
   Pencil, X as XIcon, Search, Share2, Wallet, FileText,
-  Table2, CheckCircle, AlertTriangle, Plus, Calendar,
+  Table2, CheckCircle, AlertTriangle, Plus,
 } from 'lucide-react-native';
+import { MesSeletor } from '../components/MesSeletor';
 import { CATEGORIAS, MESES, CORES_CAT } from '../constants';
 import { CatIcon } from '../constants/catIcons';
 import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
@@ -386,23 +387,21 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
           <Text style={s.greeting}>{saudacao()}</Text>
           <Text style={s.pageTitle}>Minhas Finanças</Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={s.mesSeletor}>
-            <TouchableOpacity onPress={() => navMes(-1)}>
-              <Text style={{ color: C.brand, fontSize: 16, paddingHorizontal: 4 }}>‹</Text>
-            </TouchableOpacity>
-            <Text style={{ fontSize: 13, fontWeight: '600', color: C.text }}>{MESES[filtroMes].substring(0, 3)} {filtroAno}</Text>
-            <TouchableOpacity onPress={() => navMes(1)}>
-              <Text style={{ color: C.brand, fontSize: 16, paddingHorizontal: 4 }}>›</Text>
-            </TouchableOpacity>
-          </View>
-          {Platform.OS !== 'web' && (
-            <TouchableOpacity style={s.avatar} onPress={() => supabase.auth.signOut()}>
-              <Text style={s.avatarText}>↩</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        {Platform.OS !== 'web' && (
+          <TouchableOpacity style={s.avatar} onPress={() => supabase.auth.signOut()}>
+            <Text style={s.avatarText}>↩</Text>
+          </TouchableOpacity>
+        )}
       </View>
+
+      {/* Seletor de mês — fora do split, sempre visível */}
+      <MesSeletor
+        mes={filtroMes}
+        ano={filtroAno}
+        onPrev={() => navMes(-1)}
+        onNext={() => navMes(1)}
+        style={{ marginTop: 0 }}
+      />
 
       {isDesktop ? (
         /* ── DESKTOP: duas colunas ── */
@@ -732,7 +731,6 @@ function makeStyles(C: ColorPalette) {
   pageTitle: { fontSize: 22, fontWeight: '700', color: C.text },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  mesSeletor: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.bgCard, borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: C.border },
   statCard: { backgroundColor: C.bgCard, borderRadius: 14, padding: 14, marginRight: 10, width: 150, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   statIcone: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   statLabel: { fontSize: 11, color: C.textLight, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.3 },

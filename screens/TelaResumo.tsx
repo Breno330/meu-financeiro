@@ -3,10 +3,11 @@ import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { T as Text } from '../components/T';
 import { HeroCard } from '../components/HeroCard';
 import { MESES, CORES_CAT } from '../constants';
+import { MesSeletor } from '../components/MesSeletor';
 import {
-  ArrowUpRight, ArrowDownRight, Wallet, Calendar,
+  ArrowUpRight, ArrowDownRight,
   TrendingUp, TrendingDown, BarChart2, Lightbulb,
-  Tag, AlertTriangle, CheckCircle,
+  Tag, AlertTriangle, CheckCircle, Calendar,
 } from 'lucide-react-native';
 import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, fmtSaldo } from '../utils/format';
@@ -118,24 +119,18 @@ export function TelaResumo({ transacoes, metas }: Props) {
     <ScrollView style={{ flex: 1 }}>
 
       {/* ── Header ── */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 20, paddingBottom: 16 }}>
-        <View>
-          <Text style={{ fontSize: 22, fontWeight: '700', color: C.text, letterSpacing: -0.5 }}>Resumo Financeiro</Text>
-          <Text style={{ fontSize: 13, color: C.label, marginTop: 3 }}>Acompanhe sua saúde financeira de forma simples e inteligente.</Text>
-        </View>
-        <View style={s.mesSeletor}>
-          <TouchableOpacity onPress={() => navMes(-1)}>
-            <Text style={{ color: C.brand, fontSize: 16, paddingHorizontal: 4 }}>‹</Text>
-          </TouchableOpacity>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Calendar size={13} color={C.label} strokeWidth={2} />
-              <Text style={{ fontSize: 13, fontWeight: '600', color: C.text }}>{MESES[mesSel].substring(0, 3)} {anoSel}</Text>
-            </View>
-          <TouchableOpacity onPress={() => navMes(1)}>
-            <Text style={{ color: C.brand, fontSize: 16, paddingHorizontal: 4 }}>›</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={{ padding: 20, paddingBottom: 12 }}>
+        <Text style={{ fontSize: 22, fontWeight: '700', color: C.text, letterSpacing: -0.5 }}>Resumo Financeiro</Text>
+        <Text style={{ fontSize: 13, color: C.label, marginTop: 3 }}>Acompanhe sua saúde financeira.</Text>
       </View>
+
+      {/* ── Seletor de mês ── */}
+      <MesSeletor
+        mes={mesSel}
+        ano={anoSel}
+        onPrev={() => navMes(-1)}
+        onNext={() => navMes(1)}
+      />
 
       {/* ── Linha 1: Hero + Receitas vs Despesas ── */}
       <View style={{ flexDirection: 'row', gap: 12, marginHorizontal: 16, marginBottom: 12 }}>
@@ -374,7 +369,6 @@ export function TelaResumo({ transacoes, metas }: Props) {
 
 function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
-  mesSeletor: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.bgCard, borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: C.border },
   section: { backgroundColor: C.bgCard, marginBottom: 0, borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   sectionTitulo: { fontSize: 15, fontWeight: '600', color: C.text, marginBottom: 14 },
   statCard: { backgroundColor: C.bgCard, borderRadius: 14, padding: 14, marginRight: 10, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
