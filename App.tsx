@@ -17,6 +17,7 @@ import { useToast } from './hooks/useToast';
 import { useBreakpoint } from './hooks/useBreakpoint';
 import { T } from './components/T';
 import type { Transacao, Meta, Recorrente, Aba } from './types';
+import { RADIUS, SPACE } from './theme/tokens';
 
 import { TelaLogin } from './screens/TelaLogin';
 import { TelaLancamentos } from './screens/TelaLancamentos';
@@ -400,10 +401,10 @@ function makeStyles(C: ColorPalette) {
     toastText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
     // Sidebar
-    sidebar: { backgroundColor: C.primaryDeep, paddingTop: 24, paddingBottom: 16, paddingHorizontal: 12 },
-    sidebarLogo: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)', marginBottom: 12 },
+    sidebar: { backgroundColor: C.primaryDeep, paddingTop: SPACE['2xl'], paddingBottom: SPACE.lg, paddingHorizontal: SPACE.md },
+    sidebarLogo: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, paddingBottom: SPACE['2xl'], borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)', marginBottom: SPACE.md },
     sidebarLogoText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-    sidebarItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 12, paddingLeft: 14, borderRadius: 10, marginBottom: 4, borderLeftWidth: 2.5, borderLeftColor: 'transparent' },
+    sidebarItem: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md, paddingVertical: 11, paddingHorizontal: SPACE.md, paddingLeft: 14, borderRadius: RADIUS.md, marginBottom: SPACE.xs, borderLeftWidth: 2.5, borderLeftColor: 'transparent' },
     sidebarItemAtivo: { backgroundColor: C.brandBg, borderLeftWidth: 2.5, borderLeftColor: C.brand },
     sidebarLabel: { fontSize: 14, fontWeight: '400', color: 'rgba(255,255,255,0.60)' },
     sidebarLabelAtivo: { color: C.brand, fontWeight: '600' },

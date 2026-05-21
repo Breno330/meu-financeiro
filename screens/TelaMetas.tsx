@@ -24,6 +24,7 @@ import { CatIcon } from '../constants/catIcons';
 import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, confirmar } from '../utils/format';
 import type { Transacao, Meta, Recorrente, Tipo } from '../types';
+import { RADIUS, SHADOW, SPACE, TYPE } from '../theme/tokens';
 
 type Props = {
   transacoes: Transacao[];
@@ -592,10 +593,10 @@ function makeStyles(C: ColorPalette) {
     // ── Layout ──────────────────────────────────────────────────────────
     pageHeader: {
       flexDirection: 'row', justifyContent: 'space-between',
-      alignItems: 'flex-start', padding: 20, paddingBottom: 12,
+      alignItems: 'flex-start', padding: SPACE.xl, paddingBottom: 12,
     },
     greeting: { fontSize: 13, color: C.label },
-    pageTitle: { fontSize: 22, fontWeight: '700', color: C.text, letterSpacing: -0.5 },
+    pageTitle: { ...TYPE.heading, color: C.text },
     headerIcon: {
       width: 40, height: 40, borderRadius: 12,
       backgroundColor: C.brandBg,
@@ -606,7 +607,7 @@ function makeStyles(C: ColorPalette) {
     section: {
       backgroundColor: C.bgCard,
       marginHorizontal: 16, marginBottom: 12,
-      borderRadius: 18, padding: 16,
+      borderRadius: 18, padding: SPACE.lg,
       shadowColor: '#000', shadowOpacity: 0.06,
       shadowRadius: 10, shadowOffset: { width: 0, height: 3 },
       elevation: 3,
@@ -623,7 +624,7 @@ function makeStyles(C: ColorPalette) {
     // Botão "+ Adicionar"
     addBtn: {
       flexDirection: 'row', alignItems: 'center', gap: 5,
-      backgroundColor: C.brand, borderRadius: 99,
+      backgroundColor: C.brand, borderRadius: RADIUS.full,
       paddingVertical: 7, paddingHorizontal: 12,
     },
     addBtnActive: {
@@ -651,7 +652,7 @@ function makeStyles(C: ColorPalette) {
     // ── Metas ───────────────────────────────────────────────────────────
     metaItem: {
       backgroundColor: C.bg, borderRadius: 12,
-      padding: 12, marginBottom: 8,
+      padding: SPACE.md, marginBottom: 8,
       borderWidth: 0.5, borderColor: C.borderLight,
     },
     metaIcone: {
@@ -665,7 +666,7 @@ function makeStyles(C: ColorPalette) {
     recItem: {
       flexDirection: 'row', alignItems: 'center', gap: 10,
       backgroundColor: C.bg, borderRadius: 12,
-      padding: 12, marginBottom: 8,
+      padding: SPACE.md, marginBottom: 8,
       borderWidth: 0.5, borderColor: C.borderLight,
     },
     recIcone: {
@@ -689,7 +690,7 @@ function makeStyles(C: ColorPalette) {
     },
     input: {
       borderWidth: 0.5, borderColor: C.border,
-      borderRadius: 10, padding: 11,
+      borderRadius: RADIUS.md, padding: 11,
       fontSize: 14, marginBottom: 14,
       color: C.text, backgroundColor: C.bg,
     },
@@ -698,14 +699,14 @@ function makeStyles(C: ColorPalette) {
       flex: 1, flexDirection: 'row', alignItems: 'center',
       justifyContent: 'center', gap: 6,
       borderWidth: 1, borderColor: C.border,
-      borderRadius: 10, padding: 10, backgroundColor: C.bg,
+      borderRadius: RADIUS.md, padding: 10, backgroundColor: C.bg,
     },
     tipoBtnText: { fontSize: 13, fontWeight: '500', color: C.label },
     catScroll: { marginBottom: 14 },
     catBtn: {
       flexDirection: 'row', alignItems: 'center', gap: 5,
       paddingHorizontal: 10, paddingVertical: 6,
-      borderRadius: 99, borderWidth: 0.5,
+      borderRadius: RADIUS.full, borderWidth: 0.5,
       borderColor: C.border, marginRight: 6, backgroundColor: C.bg,
     },
     catBtnText: { fontSize: 12, color: C.label },
@@ -740,7 +741,7 @@ function makeStyles(C: ColorPalette) {
     },
     utilBtn: {
       flexDirection: 'row', alignItems: 'center', gap: 12,
-      backgroundColor: C.bgCard, borderRadius: 14, padding: 14,
+      backgroundColor: C.bgCard, borderRadius: RADIUS.card, padding: 14,
       shadowColor: '#000', shadowOpacity: 0.04,
       shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1,
     },

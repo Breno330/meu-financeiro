@@ -23,6 +23,7 @@ import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, fmtSaldo, saudacao, confirmar } from '../utils/format';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import type { Transacao, Meta, Tipo } from '../types';
+import { RADIUS, SHADOW, SPACE, TYPE } from '../theme/tokens';
 
 type Props = {
   transacoes: Transacao[];
@@ -794,23 +795,23 @@ function SkeletonList({ s }: { s: ReturnType<typeof makeStyles> }) {
 
 function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
-  pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 20, paddingBottom: 12 },
+  pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: SPACE.xl, paddingBottom: 12 },
   rightPanel: { width: 300, backgroundColor: C.bgCard, borderLeftWidth: 1, borderLeftColor: C.border },
   panelSection: { fontSize: 13, fontWeight: '700', color: C.text, marginBottom: 16, marginTop: 4, letterSpacing: -0.2 },
   greeting: { fontSize: 13, color: C.label },
   pageTitle: { fontSize: 22, fontWeight: '700', color: C.text },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  statCard: { backgroundColor: C.bgCard, borderRadius: 14, padding: 14, marginRight: 10, width: 150, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  statCard: { backgroundColor: C.bgCard, borderRadius: RADIUS.card, padding: 14, marginRight: 10, width: 150, ...SHADOW.sm },
   statIcone: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   statLabel: { fontSize: 11, color: C.textLight, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.3 },
   statVal: { fontSize: 15, fontWeight: '700', color: C.text, marginBottom: 2 },
   statPct: { fontSize: 11, color: C.textLight },
   buscaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, marginBottom: 8 },
-  buscaInput: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: C.border },
-  exportBtn: { backgroundColor: C.brand, borderRadius: 10, padding: 10, alignItems: 'center', justifyContent: 'center' },
+  buscaInput: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard, borderRadius: RADIUS.md, paddingHorizontal: SPACE.md, paddingVertical: SPACE.sm, borderWidth: 1, borderColor: C.border },
+  exportBtn: { backgroundColor: C.brand, borderRadius: RADIUS.md, padding: 10, alignItems: 'center', justifyContent: 'center' },
   filtros: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, marginBottom: 8 },
-  filtroBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 0.5, borderColor: C.border, backgroundColor: C.bgCard },
+  filtroBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: RADIUS.full, borderWidth: 0.5, borderColor: C.border, backgroundColor: C.bgCard },
   filtroBtnText: { fontSize: 13, color: C.label },
   dataGrupoHeader: { fontSize: 12, fontWeight: '700', color: C.textLight, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 6 },
   txItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard, marginHorizontal: 16, marginBottom: 6, borderRadius: 12, padding: 12, gap: 10, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
@@ -826,21 +827,21 @@ function makeStyles(C: ColorPalette) {
   vazioEmoji: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   vazioTitulo: { fontSize: 16, fontWeight: '600', color: C.text, marginBottom: 6 },
   vazioSub: { fontSize: 14, color: C.textLight, textAlign: 'center', lineHeight: 22 },
-  input: { borderWidth: 0.5, borderColor: C.border, borderRadius: 10, padding: 10, fontSize: 14, marginBottom: 8, color: C.text, backgroundColor: C.bg },
+  input: { borderWidth: 0.5, borderColor: C.border, borderRadius: RADIUS.md, padding: 10, fontSize: 14, marginBottom: 8, color: C.text, backgroundColor: C.bg },
   row: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  tipoBtn: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 10, alignItems: 'center', backgroundColor: C.bg },
+  tipoBtn: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.md, padding: 10, alignItems: 'center', backgroundColor: C.bg },
   tipoBtnText: { fontSize: 13, fontWeight: '500', color: C.label },
   catScroll: { marginBottom: 12 },
-  catBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99, borderWidth: 0.5, borderColor: C.border, marginRight: 6, backgroundColor: C.bg },
+  catBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.full, borderWidth: 0.5, borderColor: C.border, marginRight: 6, backgroundColor: C.bg },
   catBtnText: { fontSize: 12, color: C.label },
-  btn: { borderRadius: 10, padding: 12, alignItems: 'center' },
+  btn: { borderRadius: RADIUS.md, padding: SPACE.md, alignItems: 'center' },
   btnText: { fontSize: 14, fontWeight: '600' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   modalBox: { backgroundColor: C.bgCard, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, borderTopWidth: 0.5, borderTopColor: C.borderLight },
   modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.borderLight, alignSelf: 'center', marginBottom: 16 },
   modalTitulo: { fontSize: 18, fontWeight: '600', color: C.text, marginBottom: 4 },
   modalSub: { fontSize: 13, color: C.label, marginBottom: 12 },
-  exportOpcao: { borderWidth: 1.5, borderRadius: 14, padding: 16, marginBottom: 10, alignItems: 'center' },
+  exportOpcao: { borderWidth: 1.5, borderRadius: RADIUS.card, padding: 16, marginBottom: 10, alignItems: 'center' },
   exportOpcaoTitulo: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
   exportOpcaoSub: { fontSize: 12, color: C.textLight },
   fab: { position: 'absolute', right: 20, bottom: 24, width: 58, height: 58, borderRadius: 29, backgroundColor: C.brand, alignItems: 'center', justifyContent: 'center', shadowColor: C.brandDark, shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 10 },

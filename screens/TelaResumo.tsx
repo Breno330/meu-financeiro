@@ -15,6 +15,7 @@ import { GraficoPizza } from '../components/GraficoPizza';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { Skeleton } from '../components/Skeleton';
 import type { Transacao, Meta } from '../types';
+import { RADIUS, SHADOW, SPACE } from '../theme/tokens';
 
 type Props = {
   transacoes: Transacao[];
@@ -426,9 +427,9 @@ export function TelaResumo({ transacoes, metas, carregando, mesSel, anoSel, navM
 
 function makeStyles(C: ColorPalette) {
   return StyleSheet.create({
-  section: { backgroundColor: C.bgCard, marginBottom: 0, borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  section: { backgroundColor: C.bgCard, marginBottom: 0, borderRadius: RADIUS.lg, padding: SPACE.lg, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   sectionTitulo: { fontSize: 15, fontWeight: '600', color: C.text, marginBottom: 14 },
-  statCard: { backgroundColor: C.bgCard, borderRadius: 14, padding: 14, marginRight: 10, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  statCard: { backgroundColor: C.bgCard, borderRadius: RADIUS.card, padding: 14, marginRight: 10, ...SHADOW.sm },
   statIcone: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   statLabel: { fontSize: 11, color: C.textLight, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.3 },
   statVal: { fontSize: 15, fontWeight: '700', color: C.text, marginBottom: 2 },

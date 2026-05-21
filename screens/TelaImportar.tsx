@@ -14,6 +14,7 @@ import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt } from '../utils/format';
 import { parseOFX } from '../utils/ofx';
 import type { Transacao, Meta, TransacaoOFX, Aba } from '../types';
+import { RADIUS, SHADOW, SPACE, TYPE } from '../theme/tokens';
 
 type Props = {
   transacoes: Transacao[];
@@ -306,8 +307,8 @@ function makeStyles(C: ColorPalette) {
       borderWidth: 1, borderColor: C.border,
     },
     emptyTitle: {
-      fontSize: 22, fontWeight: '700', color: C.text,
-      letterSpacing: -0.5, textAlign: 'center', marginBottom: 10,
+      ...TYPE.heading, color: C.text,
+      textAlign: 'center', marginBottom: 10,
     },
     emptySub: {
       fontSize: 14, color: C.label, textAlign: 'center',
@@ -315,8 +316,8 @@ function makeStyles(C: ColorPalette) {
     },
     stepsCard: {
       marginHorizontal: 16, marginBottom: 16,
-      backgroundColor: C.bgCard, borderRadius: 16,
-      padding: 16,
+      backgroundColor: C.bgCard, borderRadius: RADIUS.lg,
+      padding: SPACE.lg,
       shadowColor: '#000', shadowOpacity: 0.05,
       shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
       elevation: 2,
@@ -334,7 +335,7 @@ function makeStyles(C: ColorPalette) {
       borderBottomWidth: 0.5, borderBottomColor: C.borderLight,
     },
     stepNum: {
-      width: 28, height: 28, borderRadius: 99,
+      width: 28, height: 28, borderRadius: RADIUS.full,
       backgroundColor: C.brandBg,
       alignItems: 'center', justifyContent: 'center',
     },
@@ -347,8 +348,8 @@ function makeStyles(C: ColorPalette) {
     ctaBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
       gap: 10, marginHorizontal: 16, marginBottom: 16,
-      backgroundColor: C.brand, borderRadius: 14,
-      paddingVertical: 16,
+      backgroundColor: C.brand, borderRadius: RADIUS.card,
+      paddingVertical: SPACE.lg,
       shadowColor: C.brandDark, shadowOpacity: 0.35,
       shadowRadius: 12, shadowOffset: { width: 0, height: 5 },
       elevation: 6,
@@ -358,8 +359,8 @@ function makeStyles(C: ColorPalette) {
     },
     banksCard: {
       marginHorizontal: 16,
-      backgroundColor: C.bgCard, borderRadius: 16,
-      padding: 16,
+      backgroundColor: C.bgCard, borderRadius: RADIUS.lg,
+      padding: SPACE.lg,
       shadowColor: '#000', shadowOpacity: 0.05,
       shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
       elevation: 2,
@@ -381,11 +382,9 @@ function makeStyles(C: ColorPalette) {
     fileHeader: {
       flexDirection: 'row', alignItems: 'center', gap: 12,
       margin: 16, marginBottom: 8,
-      backgroundColor: C.bgCard, borderRadius: 14, padding: 14,
+      backgroundColor: C.bgCard, borderRadius: RADIUS.card, padding: 14,
       borderWidth: 1, borderColor: C.brandBg,
-      shadowColor: '#000', shadowOpacity: 0.05,
-      shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
-      elevation: 2,
+      ...SHADOW.sm,
     },
     fileHeaderIcon: {
       width: 40, height: 40, borderRadius: 10,
@@ -408,7 +407,7 @@ function makeStyles(C: ColorPalette) {
     massBtn: {
       flex: 1, flexDirection: 'row', alignItems: 'center',
       justifyContent: 'center', gap: 6,
-      backgroundColor: C.bgCard, borderRadius: 10,
+      backgroundColor: C.bgCard, borderRadius: RADIUS.md,
       paddingVertical: 8,
       borderWidth: 0.5, borderColor: C.border,
     },
@@ -439,7 +438,7 @@ function makeStyles(C: ColorPalette) {
     importBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
       gap: 8, margin: 16, marginTop: 8,
-      backgroundColor: C.brand, borderRadius: 14, paddingVertical: 16,
+      backgroundColor: C.brand, borderRadius: RADIUS.card, paddingVertical: SPACE.lg,
       shadowColor: C.brandDark, shadowOpacity: 0.35,
       shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 6,
     },
