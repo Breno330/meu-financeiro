@@ -252,7 +252,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
         {/* Ações — visíveis sempre no mobile, só no hover no desktop */}
         <View style={[s.txAcoes, { opacity: !isDesktop || isHovered ? 1 : 0 }]}>
           <TouchableOpacity onPress={() => abrirEdicao(t)} style={s.txAcaoBtn}>
-            <Pencil size={14} color={isHovered ? C.primary : C.label} strokeWidth={1.8} />
+            <Pencil size={14} color={isHovered ? C.brand : C.label} strokeWidth={1.8} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => remover(t.id)} style={s.txAcaoBtn}>
             <XIcon size={14} color={isHovered ? C.despesa : C.textLight} strokeWidth={1.8} />
@@ -271,7 +271,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
             <View style={s.modalBox}>
               <View style={s.modalHandle}/>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Pencil size={16} color={C.primary} strokeWidth={2} />
+                <Pencil size={16} color={C.brand} strokeWidth={2} />
                 <Text style={s.modalTitulo}>Editar lançamento</Text>
               </View>
               <TextInput style={s.input} placeholder="Descrição" placeholderTextColor={C.textLight} value={editDesc} onChangeText={setEditDesc}/>
@@ -286,10 +286,10 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[s.catScroll, { marginBottom: 12 }]}>
                 {CATEGORIAS.map(c => (
-                  <TouchableOpacity key={c} style={[s.catBtn, editCat === c && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setEditCat(c)}>
+                  <TouchableOpacity key={c} style={[s.catBtn, editCat === c && { backgroundColor: C.brand, borderColor: C.brand }]} onPress={() => setEditCat(c)}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                      <CatIcon categoria={c} size={12} color={editCat === c ? '#fff' : C.label} strokeWidth={2} />
-                      <Text style={[s.catBtnText, editCat === c && { color: '#fff' }]}>{c}</Text>
+                      <CatIcon categoria={c} size={12} color={editCat === c ? C.primaryDark : C.label} strokeWidth={2} />
+                      <Text style={[s.catBtnText, editCat === c && { color: C.primaryDark }]}>{c}</Text>
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -298,8 +298,8 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
                 <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: C.bgAccent }]} onPress={() => setTxEditando(null)}>
                   <Text style={[s.btnText, { color: C.primaryDark }]}>Cancelar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.btn, { flex: 2, backgroundColor: C.primary, opacity: salvandoEdit ? 0.6 : 1 }]} onPress={salvarEdicao} disabled={salvandoEdit}>
-                  <Text style={[s.btnText, { color: '#fff' }]}>{salvandoEdit ? 'Salvando...' : 'Salvar alterações'}</Text>
+                <TouchableOpacity style={[s.btn, { flex: 2, backgroundColor: C.brand, opacity: salvandoEdit ? 0.6 : 1 }]} onPress={salvarEdicao} disabled={salvandoEdit}>
+                  <Text style={[s.btnText, { color: C.primaryDark }]}>{salvandoEdit ? 'Salvando...' : 'Salvar alterações'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -314,7 +314,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
             <View style={s.modalBox}>
               <View style={s.modalHandle}/>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Plus size={16} color={C.primary} strokeWidth={2} />
+                <Plus size={16} color={C.brand} strokeWidth={2} />
                 <Text style={s.modalTitulo}>Novo lançamento</Text>
               </View>
               <TextInput style={s.input} placeholder="Descrição" placeholderTextColor={C.textLight} value={desc} onChangeText={setDesc}/>
@@ -329,10 +329,10 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.catScroll}>
                 {CATEGORIAS.map(c => (
-                  <TouchableOpacity key={c} style={[s.catBtn, cat === c && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setCat(c)}>
+                  <TouchableOpacity key={c} style={[s.catBtn, cat === c && { backgroundColor: C.brand, borderColor: C.brand }]} onPress={() => setCat(c)}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                      <CatIcon categoria={c} size={12} color={cat === c ? '#fff' : C.label} strokeWidth={2} />
-                      <Text style={[s.catBtnText, cat === c && { color: '#fff' }]}>{c}</Text>
+                      <CatIcon categoria={c} size={12} color={cat === c ? C.primaryDark : C.label} strokeWidth={2} />
+                      <Text style={[s.catBtnText, cat === c && { color: C.primaryDark }]}>{c}</Text>
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -341,8 +341,8 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
                 <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: C.bgAccent }]} onPress={() => { setShowFormModal(false); setDesc(''); setVal(''); }}>
                   <Text style={[s.btnText, { color: C.primaryDark }]}>Cancelar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.btn, { flex: 2, backgroundColor: C.primary, opacity: salvando ? 0.6 : 1 }]} onPress={adicionar} disabled={salvando}>
-                  <Text style={[s.btnText, { color: '#fff' }]}>{salvando ? 'Salvando...' : 'Salvar lançamento'}</Text>
+                <TouchableOpacity style={[s.btn, { flex: 2, backgroundColor: C.brand, opacity: salvando ? 0.6 : 1 }]} onPress={adicionar} disabled={salvando}>
+                  <Text style={[s.btnText, { color: C.primaryDark }]}>{salvando ? 'Salvando...' : 'Salvar lançamento'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -356,7 +356,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
           <View style={[s.modalBox, { paddingBottom: 24 }]}>
             <View style={s.modalHandle}/>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <Share2 size={16} color={C.primary} strokeWidth={2} />
+              <Share2 size={16} color={C.brand} strokeWidth={2} />
               <Text style={s.modalTitulo}>Exportar relatório</Text>
             </View>
             <Text style={s.modalSub}>{MESES[filtroMes]} de {filtroAno}</Text>
@@ -389,11 +389,11 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <View style={s.mesSeletor}>
             <TouchableOpacity onPress={() => navMes(-1)}>
-              <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>‹</Text>
+              <Text style={{ color: C.brand, fontSize: 16, paddingHorizontal: 4 }}>‹</Text>
             </TouchableOpacity>
             <Text style={{ fontSize: 13, fontWeight: '600', color: C.text }}>{MESES[filtroMes].substring(0, 3)} {filtroAno}</Text>
             <TouchableOpacity onPress={() => navMes(1)}>
-              <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>›</Text>
+              <Text style={{ color: C.brand, fontSize: 16, paddingHorizontal: 4 }}>›</Text>
             </TouchableOpacity>
           </View>
           {Platform.OS !== 'web' && (
@@ -486,8 +486,8 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
             {/* Filtros */}
             <View style={[s.filtros, { paddingTop: 0 }]}>
               {(['todas', 'receita', 'despesa'] as const).map(f => (
-                <TouchableOpacity key={f} style={[s.filtroBtn, filtro === f && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setFiltro(f)}>
-                  <Text style={[s.filtroBtnText, filtro === f && { color: '#fff' }]}>
+                <TouchableOpacity key={f} style={[s.filtroBtn, filtro === f && { backgroundColor: C.brand, borderColor: C.brand }]} onPress={() => setFiltro(f)}>
+                  <Text style={[s.filtroBtnText, filtro === f && { color: C.primaryDark }]}>
                     {f === 'todas' ? 'Todas' : f === 'receita' ? 'Receitas' : 'Despesas'}
                   </Text>
                 </TouchableOpacity>
@@ -684,8 +684,8 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
           {/* Filtros */}
           <View style={[s.filtros, { paddingTop: 0 }]}>
             {(['todas', 'receita', 'despesa'] as const).map(f => (
-              <TouchableOpacity key={f} style={[s.filtroBtn, filtro === f && { backgroundColor: C.primary, borderColor: C.primary }]} onPress={() => setFiltro(f)}>
-                <Text style={[s.filtroBtnText, filtro === f && { color: '#fff' }]}>
+              <TouchableOpacity key={f} style={[s.filtroBtn, filtro === f && { backgroundColor: C.brand, borderColor: C.brand }]} onPress={() => setFiltro(f)}>
+                <Text style={[s.filtroBtnText, filtro === f && { color: C.primaryDark }]}>
                   {f === 'todas' ? 'Todas' : f === 'receita' ? 'Receitas' : 'Despesas'}
                 </Text>
               </TouchableOpacity>
@@ -740,7 +740,7 @@ function makeStyles(C: ColorPalette) {
   statPct: { fontSize: 11, color: C.textLight },
   buscaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, marginBottom: 8 },
   buscaInput: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: C.border },
-  exportBtn: { backgroundColor: C.primaryDark, borderRadius: 10, padding: 10, alignItems: 'center', justifyContent: 'center' },
+  exportBtn: { backgroundColor: C.brand, borderRadius: 10, padding: 10, alignItems: 'center', justifyContent: 'center' },
   filtros: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, marginBottom: 8 },
   filtroBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 0.5, borderColor: C.border, backgroundColor: C.bgCard },
   filtroBtnText: { fontSize: 13, color: C.label },
@@ -775,7 +775,7 @@ function makeStyles(C: ColorPalette) {
   exportOpcao: { borderWidth: 1.5, borderRadius: 14, padding: 16, marginBottom: 10, alignItems: 'center' },
   exportOpcaoTitulo: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
   exportOpcaoSub: { fontSize: 12, color: C.textLight },
-  fab: { position: 'absolute', right: 20, bottom: 24, width: 58, height: 58, borderRadius: 29, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', shadowColor: C.primaryDeep, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 10 },
+  fab: { position: 'absolute', right: 20, bottom: 24, width: 58, height: 58, borderRadius: 29, backgroundColor: C.brand, alignItems: 'center', justifyContent: 'center', shadowColor: C.brandDark, shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 10 },
   fabText: { fontSize: 28, color: '#fff', lineHeight: 34, marginTop: -2 },
   });
 }

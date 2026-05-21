@@ -39,8 +39,8 @@ export function TelaLogin() {
   };
 
   const LP = {
-    bg: C.bg, accent: C.primary, accentLight: C.bgAccent,
-    accentMid: C.border, text: C.text, label: C.label, highlight: C.receita,
+    bg: C.bg, accent: C.brand, accentLight: C.brandBg,
+    accentMid: C.border, text: C.text, label: C.label, highlight: C.brand,
   };
 
   if (Platform.OS === 'web') {
@@ -144,8 +144,8 @@ export function TelaLogin() {
                 onPress={modo === 'login' ? entrar : cadastrar} disabled={carregando}
               >
                 {carregando
-                  ? <ActivityIndicator color="#fff"/>
-                  : <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>{modo === 'login' ? 'Entrar' : 'Criar conta'}</Text>
+                  ? <ActivityIndicator color={C.primaryDark}/>
+                  : <Text style={{ color: C.primaryDark, fontWeight: '700', fontSize: 15 }}>{modo === 'login' ? 'Entrar' : 'Criar conta'}</Text>
                 }
               </TouchableOpacity>
               <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 5 }}>
@@ -191,18 +191,18 @@ export function TelaLogin() {
             value={senha} onChangeText={setSenha} secureTextEntry
           />
           <TouchableOpacity
-            style={{ backgroundColor: C.primary, borderRadius: 12, padding: 15, alignItems: 'center', opacity: carregando ? 0.6 : 1 }}
+            style={{ backgroundColor: C.brand, borderRadius: 12, padding: 15, alignItems: 'center', opacity: carregando ? 0.6 : 1 }}
             onPress={modo === 'login' ? entrar : cadastrar} disabled={carregando}
           >
             {carregando
-              ? <ActivityIndicator color="#fff"/>
-              : <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>{modo === 'login' ? 'Entrar' : 'Criar conta'}</Text>
+              ? <ActivityIndicator color={C.primaryDark}/>
+              : <Text style={{ color: C.primaryDark, fontWeight: '700', fontSize: 15 }}>{modo === 'login' ? 'Entrar' : 'Criar conta'}</Text>
             }
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 20 }}>
             <Text style={{ fontSize: 14, color: C.label }}>{modo === 'login' ? 'Não tem conta?' : 'Já tem conta?'}</Text>
             <TouchableOpacity onPress={() => setModo(modo === 'login' ? 'cadastro' : 'login')}>
-              <Text style={{ fontSize: 14, color: C.primary, fontWeight: '700' }}>{modo === 'login' ? 'Cadastre-se' : 'Entrar'}</Text>
+              <Text style={{ fontSize: 14, color: C.brand, fontWeight: '700' }}>{modo === 'login' ? 'Cadastre-se' : 'Entrar'}</Text>
             </TouchableOpacity>
           </View>
         </View>

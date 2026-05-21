@@ -125,14 +125,14 @@ export function TelaResumo({ transacoes, metas }: Props) {
         </View>
         <View style={s.mesSeletor}>
           <TouchableOpacity onPress={() => navMes(-1)}>
-            <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>‹</Text>
+            <Text style={{ color: C.brand, fontSize: 16, paddingHorizontal: 4 }}>‹</Text>
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
               <Calendar size={13} color={C.label} strokeWidth={2} />
               <Text style={{ fontSize: 13, fontWeight: '600', color: C.text }}>{MESES[mesSel].substring(0, 3)} {anoSel}</Text>
             </View>
           <TouchableOpacity onPress={() => navMes(1)}>
-            <Text style={{ color: C.primary, fontSize: 16, paddingHorizontal: 4 }}>›</Text>
+            <Text style={{ color: C.brand, fontSize: 16, paddingHorizontal: 4 }}>›</Text>
           </TouchableOpacity>
         </View>
       </View>

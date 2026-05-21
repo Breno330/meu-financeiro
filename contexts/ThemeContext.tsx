@@ -6,6 +6,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export const LIGHT = {
   bg: '#F8FAFC', bgCard: '#FFFFFF', bgAccent: '#F1F5F9',
   primary: '#1E293B', primaryDark: '#0F172A', primaryDeep: '#0F172A',
+  // ── Cor de marca (amber do logo #f6a623) ──
+  brand: '#F6A623', brandDark: '#D4880F', brandBg: 'rgba(246,166,35,0.10)',
   border: '#E2E8F0', borderLight: '#F1F5F9',
   receita: '#10B981', receitaBg: '#ECFDF5',
   despesa: '#F43F5E', despesaBg: '#FFF1F2',
@@ -16,6 +18,8 @@ export const LIGHT = {
 export const DARK = {
   bg: '#0F1117', bgCard: '#1A1D2E', bgAccent: '#1E2140',
   primary: '#6366F1', primaryDark: '#4338CA', primaryDeep: '#0D0F1A',
+  // ── Cor de marca — amber mais claro no dark mode ──
+  brand: '#FBBF24', brandDark: '#F59E0B', brandBg: 'rgba(251,191,36,0.12)',
   border: '#2D3148', borderLight: '#1E2140',
   receita: '#34D399', receitaBg: '#064E3B',
   despesa: '#F87171', despesaBg: '#450A0A',

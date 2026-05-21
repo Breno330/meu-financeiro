@@ -174,8 +174,8 @@ function AppInner() {
 
   if (!session) return <TelaLogin />;
 
-  const ICON_COLOR_ACTIVE = '#fff';
-  const ICON_COLOR = 'rgba(255,255,255,0.55)';
+  const ICON_COLOR_ACTIVE = C.brand;
+  const ICON_COLOR = 'rgba(255,255,255,0.50)';
   const ICON_SIZE  = 20;
 
   const TABS: { key: Aba; Icon: React.ComponentType<any>; label: string }[] = [
@@ -200,8 +200,8 @@ function AppInner() {
             {/* Logo + toggle de tema */}
             <View style={[s.sidebarLogo, compact && { justifyContent: 'center', paddingHorizontal: 0 }]}>
               {compact ? (
-                <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: C.receita, alignItems: 'center', justifyContent: 'center' }}>
-                  <T style={{ fontSize: 16 }}>💰</T>
+                <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: C.brand, alignItems: 'center', justifyContent: 'center' }}>
+                  <T style={{ fontSize: 16 }}>$</T>
                 </View>
               ) : (
                 <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
@@ -320,7 +320,7 @@ function AppInner() {
             const active = aba === key;
             return (
               <TouchableOpacity key={key} style={[s.tabItem, active && s.tabItemAtivo]} onPress={() => setAba(key)}>
-                <Icon size={22} color={active ? C.primary : C.textLight} strokeWidth={active ? 2.2 : 1.8} />
+                <Icon size={22} color={active ? C.brand : C.textLight} strokeWidth={active ? 2.2 : 1.8} />
                 <T style={[s.tabLabel, active && s.tabLabelAtivo]}>{label}</T>
               </TouchableOpacity>
             );
@@ -341,9 +341,9 @@ function makeStyles(C: ColorPalette) {
     // Tab bar
     tabBar: { flexDirection: 'row', backgroundColor: C.bgCard, borderTopWidth: 0.5, borderTopColor: C.borderLight, paddingBottom: Platform.OS === 'ios' ? 0 : 4, paddingTop: 8 },
     tabItem: { flex: 1, alignItems: 'center', paddingVertical: 4, gap: 3 },
-    tabItemAtivo: { borderTopWidth: 2, borderTopColor: C.primary, marginTop: -8, paddingTop: 12 },
+    tabItemAtivo: { borderTopWidth: 2, borderTopColor: C.brand, marginTop: -8, paddingTop: 12 },
     tabLabel: { fontSize: 10, color: C.textLight, fontWeight: '400' },
-    tabLabelAtivo: { color: C.primary, fontWeight: '600' },
+    tabLabelAtivo: { color: C.brand, fontWeight: '600' },
 
     // Toast
     toast: { position: 'absolute', bottom: 90, alignSelf: 'center', backgroundColor: C.primaryDeep, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 24, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
@@ -353,10 +353,10 @@ function makeStyles(C: ColorPalette) {
     sidebar: { backgroundColor: C.primaryDeep, paddingTop: 24, paddingBottom: 16, paddingHorizontal: 12 },
     sidebarLogo: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)', marginBottom: 12 },
     sidebarLogoText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-    sidebarItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 10, marginBottom: 4 },
-    sidebarItemAtivo: { backgroundColor: 'rgba(255,255,255,0.13)' },
-    sidebarLabel: { fontSize: 14, fontWeight: '400', color: 'rgba(255,255,255,0.65)' },
-    sidebarLabelAtivo: { color: '#fff', fontWeight: '600' },
+    sidebarItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 12, paddingLeft: 14, borderRadius: 10, marginBottom: 4, borderLeftWidth: 2.5, borderLeftColor: 'transparent' },
+    sidebarItemAtivo: { backgroundColor: C.brandBg, borderLeftWidth: 2.5, borderLeftColor: C.brand },
+    sidebarLabel: { fontSize: 14, fontWeight: '400', color: 'rgba(255,255,255,0.60)' },
+    sidebarLabelAtivo: { color: C.brand, fontWeight: '600' },
 
     // Alertas
     alertaBanner: { backgroundColor: '#E24B4A', padding: 10, alignItems: 'center' },
