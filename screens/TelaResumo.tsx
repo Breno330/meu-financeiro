@@ -177,9 +177,13 @@ export function TelaResumo({ transacoes, metas }: Props) {
             </View>
             {(receitasMes > 0 || despesasMes > 0) && (
               <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-                <GraficoPizza dados={[['Receitas', receitasMes], ['Despesas', despesasMes]]} />
-                <Text style={{ fontSize: 11, color: C.label, marginTop: -60 }}>{pctDespTotal}%</Text>
-                <Text style={{ fontSize: 10, color: C.textLight, marginTop: 2, marginBottom: 60 }}>Despesas</Text>
+                <GraficoPizza
+                  dados={[['Receitas', receitasMes], ['Despesas', despesasMes]]}
+                  colors={[C.receita, C.despesa]}
+                  size={130}
+                  centerLabel={`${pctDespTotal}%`}
+                  centerSub="Desp."
+                />
               </View>
             )}
           </View>
@@ -241,36 +245,59 @@ export function TelaResumo({ transacoes, metas }: Props) {
         {/* Evolução */}
         <View style={[s.section, { flex: 1 }]}>
           <Text style={s.sectionTitulo}>Evolução dos últimos 4 meses</Text>
-          <View style={{ flexDirection: 'row', marginBottom: 4 }}>
-            <View style={{ width: 48 }}>
-              {[tendMax, tendMax * 0.75, tendMax * 0.5, tendMax * 0.25, 0].map((v, i) => (
-                <Text key={i} style={{ fontSize: 9, color: C.textLight, textAlign: 'right', paddingRight: 4, height: 20, lineHeight: 20 }}>
-                  {v > 999 ? `R$${Math.round(v / 1000)}k` : v > 0 ? `R$${Math.round(v)}` : 'R$0'}
-                </Text>
-              ))}
+
+          {tendencia.every(t => t.rec === 0 && t.desp === 0) ? (
+            /* ── Empty state ── */
+            <View style={{ alignItems: 'center', paddingVertical: 28 }}>
+              <View style={{
+                width: 52, height: 52, borderRadius: 14,
+                backgroundColor: C.bgAccent,
+                alignItems: 'center', justifyContent: 'center', marginBottom: 10,
+              }}>
+                <BarChart2 size={24} color={C.textLight} strokeWidth={1.5} />
+              </View>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: C.label, marginBottom: 4 }}>
+                Sem dados para exibir
+              </Text>
+              <Text style={{ fontSize: 12, color: C.textLight, textAlign: 'center', lineHeight: 18 }}>
+                Adicione transações nos últimos{'\n'}4 meses para ver a evolução.
+              </Text>
             </View>
-            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: 100 }}>
-              {tendencia.map((t, i) => (
-                <View key={i} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: 100 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 90 }}>
-                    <View style={{ width: 10, height: Math.max((t.rec / tendMax) * 90, t.rec > 0 ? 4 : 0), backgroundColor: C.receita, borderRadius: 3 }}/>
-                    <View style={{ width: 10, height: Math.max((t.desp / tendMax) * 90, t.desp > 0 ? 4 : 0), backgroundColor: C.despesa, borderRadius: 3 }}/>
-                  </View>
-                  <Text style={{ fontSize: 10, color: C.textLight, marginTop: 6 }}>{t.label}</Text>
+          ) : (
+            /* ── Gráfico de barras ── */
+            <>
+              <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+                <View style={{ width: 48 }}>
+                  {[tendMax, tendMax * 0.75, tendMax * 0.5, tendMax * 0.25, 0].map((v, i) => (
+                    <Text key={i} style={{ fontSize: 9, color: C.textLight, textAlign: 'right', paddingRight: 4, height: 20, lineHeight: 20 }}>
+                      {v > 999 ? `R$${Math.round(v / 1000)}k` : v > 0 ? `R$${Math.round(v)}` : 'R$0'}
+                    </Text>
+                  ))}
                 </View>
-              ))}
-            </View>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 16, marginTop: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: C.receita }}/>
-              <Text style={{ fontSize: 12, color: C.label }}>Receitas</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: C.despesa }}/>
-              <Text style={{ fontSize: 12, color: C.label }}>Despesas</Text>
-            </View>
-          </View>
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: 100 }}>
+                  {tendencia.map((t, i) => (
+                    <View key={i} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: 100 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 90 }}>
+                        <View style={{ width: 10, height: Math.max((t.rec / tendMax) * 90, t.rec > 0 ? 4 : 0), backgroundColor: C.receita, borderRadius: 3 }}/>
+                        <View style={{ width: 10, height: Math.max((t.desp / tendMax) * 90, t.desp > 0 ? 4 : 0), backgroundColor: C.despesa, borderRadius: 3 }}/>
+                      </View>
+                      <Text style={{ fontSize: 10, color: C.textLight, marginTop: 6 }}>{t.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 16, marginTop: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: C.receita }}/>
+                  <Text style={{ fontSize: 12, color: C.label }}>Receitas</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: C.despesa }}/>
+                  <Text style={{ fontSize: 12, color: C.label }}>Despesas</Text>
+                </View>
+              </View>
+            </>
+          )}
         </View>
 
         {/* Categorias */}
@@ -279,9 +306,12 @@ export function TelaResumo({ transacoes, metas }: Props) {
           {cats.length > 0 ? (
             <>
               <View style={{ alignItems: 'center', marginBottom: 8 }}>
-                <GraficoPizza dados={cats}/>
-                <Text style={{ fontSize: 12, color: C.label, marginTop: -50, fontWeight: '600' }}>{fmt(despesasMes)}</Text>
-                <Text style={{ fontSize: 10, color: C.textLight, marginBottom: 50 }}>Total</Text>
+                <GraficoPizza
+                  dados={cats}
+                  size={160}
+                  centerLabel={fmt(despesasMes)}
+                  centerSub="Total"
+                />
               </View>
               {cats.map(([c, v]) => {
                 const pct = despesasMes > 0 ? Math.round(v / despesasMes * 100) : 0;
