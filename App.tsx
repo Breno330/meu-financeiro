@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  View, TouchableOpacity, Image,
+  View, TouchableOpacity, Image, Animated,
   StyleSheet, SafeAreaView, ActivityIndicator, Platform,
 } from 'react-native';
 import { supabase } from './supabase';
@@ -73,6 +73,28 @@ function AppInner() {
   // ── UI ──────────────────────────────────────────────────────────────────────
   const [aba, setAba] = useState<Aba>('lancamentos');
   const { toastMsg, toastVisible, mostrarToast } = useToast();
+
+  // ── Animações de tela e toast ───────────────────────────────────────────────
+  const screenAnim = useRef(new Animated.Value(1)).current;
+  const isFirstRender = useRef(true);
+  const toastAnim = useRef(new Animated.Value(0)).current;
+
+  // Fade-in suave ao trocar de aba
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    screenAnim.setValue(0);
+    Animated.timing(screenAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+  }, [aba]);
+
+  // Toast: slide-up + fade
+  useEffect(() => {
+    Animated.spring(toastAnim, {
+      toValue: toastVisible ? 1 : 0,
+      useNativeDriver: true,
+      tension: 120,
+      friction: 10,
+    }).start();
+  }, [toastVisible]);
 
   useEffect(() => { if (session) carregarTudo(); }, [session]);
 
@@ -278,40 +300,48 @@ function AppInner() {
           )}
           {showAlertas && alertas.map((a, i) => <T key={i} style={s.alertaItem}>{a}</T>)}
 
-          {/* Telas */}
-          {aba === 'lancamentos' && (
-            <TelaLancamentos
-              transacoes={transacoes} metas={metas}
-              setTransacoes={setTransacoes} calcularAlertas={calcularAlertas}
-              mostrarToast={mostrarToast} carregando={carregando}
-            />
-          )}
-          {aba === 'resumo' && (
-            <TelaResumo transacoes={transacoes} metas={metas} />
-          )}
-          {aba === 'metas' && (
-            <TelaMetas
-              transacoes={transacoes} metas={metas} recorrentes={recorrentes}
-              setMetas={setMetas} setRecorrentes={setRecorrentes}
-              calcularAlertas={calcularAlertas} mostrarToast={mostrarToast}
-            />
-          )}
-          {aba === 'importar' && (
-            <TelaImportar
-              transacoes={transacoes} metas={metas}
-              setTransacoes={setTransacoes} calcularAlertas={calcularAlertas}
-              mostrarToast={mostrarToast} setAba={setAba}
-            />
-          )}
+          {/* Telas — wrapped em Animated.View para fade suave na troca de aba */}
+          <Animated.View style={{ flex: 1, opacity: screenAnim }}>
+            {aba === 'lancamentos' && (
+              <TelaLancamentos
+                transacoes={transacoes} metas={metas}
+                setTransacoes={setTransacoes} calcularAlertas={calcularAlertas}
+                mostrarToast={mostrarToast} carregando={carregando}
+              />
+            )}
+            {aba === 'resumo' && (
+              <TelaResumo transacoes={transacoes} metas={metas} />
+            )}
+            {aba === 'metas' && (
+              <TelaMetas
+                transacoes={transacoes} metas={metas} recorrentes={recorrentes}
+                setMetas={setMetas} setRecorrentes={setRecorrentes}
+                calcularAlertas={calcularAlertas} mostrarToast={mostrarToast}
+              />
+            )}
+            {aba === 'importar' && (
+              <TelaImportar
+                transacoes={transacoes} metas={metas}
+                setTransacoes={setTransacoes} calcularAlertas={calcularAlertas}
+                mostrarToast={mostrarToast} setAba={setAba}
+              />
+            )}
+          </Animated.View>
         </View>
       </View>
 
-      {/* Toast */}
-      {toastVisible && (
-        <View style={s.toast} pointerEvents="none">
-          <T style={s.toastText}>{toastMsg}</T>
-        </View>
-      )}
+      {/* Toast — sempre montado, animado via opacity + translateY */}
+      <Animated.View
+        style={[s.toast, {
+          opacity: toastAnim,
+          transform: [{
+            translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }),
+          }],
+        }]}
+        pointerEvents="none"
+      >
+        <T style={s.toastText}>{toastMsg}</T>
+      </Animated.View>
 
       {/* Tab bar — só mobile */}
       {Platform.OS !== 'web' && (

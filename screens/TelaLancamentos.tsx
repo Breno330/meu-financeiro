@@ -1,8 +1,9 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View, TextInput, TouchableOpacity, ScrollView,
-  ActivityIndicator, Modal, KeyboardAvoidingView, Platform, StyleSheet, Alert,
+  Animated, Modal, KeyboardAvoidingView, Platform, StyleSheet, Alert,
 } from 'react-native';
+import { Skeleton } from '../components/Skeleton';
 import { T as Text } from '../components/T';
 import { HeroCard } from '../components/HeroCard';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -61,6 +62,9 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
 
   // Hover (desktop)
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  // FAB bounce
+  const fabScale = useRef(new Animated.Value(1)).current;
 
   // Export
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -495,7 +499,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
 
             {/* Lista */}
             {carregando ? (
-              <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }}/>
+              <SkeletonList s={s} />
             ) : visiveis.length === 0 ? (
               <View style={s.vazioContainer}>
                 <View style={[s.vazioEmoji, { backgroundColor: C.bgAccent, borderRadius: 20 }]}>
@@ -693,7 +697,7 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
 
           {/* Lista agrupada */}
           {carregando ? (
-            <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }}/>
+            <SkeletonList s={s} />
           ) : visiveis.length === 0 ? (
             <View style={s.vazioContainer}>
               <View style={[s.vazioEmoji, { backgroundColor: C.bgAccent, borderRadius: 20 }]}>
@@ -714,11 +718,45 @@ export function TelaLancamentos({ transacoes, metas, setTransacoes, calcularAler
         </ScrollView>
       )}
 
-      {/* FAB */}
-      <TouchableOpacity style={s.fab} onPress={() => setShowFormModal(true)} activeOpacity={0.85}>
-        <Text style={s.fabText}>＋</Text>
-      </TouchableOpacity>
+      {/* FAB — spring bounce no press */}
+      <Animated.View style={[s.fab, { transform: [{ scale: fabScale }] }]}>
+        <TouchableOpacity
+          style={{ width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' }}
+          onPress={() => setShowFormModal(true)}
+          onPressIn={() =>
+            Animated.spring(fabScale, { toValue: 0.88, useNativeDriver: true, speed: 300, bounciness: 0 }).start()
+          }
+          onPressOut={() =>
+            Animated.spring(fabScale, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 14 }).start()
+          }
+          activeOpacity={1}
+        >
+          <Text style={s.fabText}>＋</Text>
+        </TouchableOpacity>
+      </Animated.View>
     </>
+  );
+}
+
+// ── Skeleton list — substitui ActivityIndicator durante carregamento ──────────
+function SkeletonList({ s }: { s: ReturnType<typeof makeStyles> }) {
+  const WIDTHS = ['62%', '78%', '55%', '70%', '48%', '65%', '72%'] as const;
+  const SUB_W  = ['38%', '50%', '30%', '45%', '35%', '42%', '38%'] as const;
+  return (
+    <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+      {/* Fake date header */}
+      <Skeleton width={90} height={10} radius={4} style={{ marginBottom: 12, marginTop: 8 }} />
+      {WIDTHS.map((w, i) => (
+        <View key={i} style={[s.txItem, { marginBottom: 6 }]}>
+          <Skeleton width={36} height={36} radius={10} />
+          <View style={{ flex: 1, gap: 7 }}>
+            <Skeleton width={w} height={13} radius={4} />
+            <Skeleton width={SUB_W[i]} height={11} radius={4} />
+          </View>
+          <Skeleton width={54} height={13} radius={4} />
+        </View>
+      ))}
+    </View>
   );
 }
 

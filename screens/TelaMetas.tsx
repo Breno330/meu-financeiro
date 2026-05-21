@@ -1,5 +1,17 @@
 import { useState, useCallback, useMemo } from 'react';
-import { View, TextInput, TouchableOpacity, ScrollView, Alert, StyleSheet } from 'react-native';
+import { View, TextInput, TouchableOpacity, ScrollView, Alert, StyleSheet, LayoutAnimation, Platform, UIManager } from 'react-native';
+
+// Ativa LayoutAnimation no Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const LAYOUT_ANIM = {
+  duration: 280,
+  create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+  update: { type: LayoutAnimation.Types.easeInEaseOut },
+  delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+};
 import { T as Text } from '../components/T';
 import {
   Target, Plus, X as XIcon, ChevronDown, ChevronUp,
@@ -48,6 +60,17 @@ export function TelaMetas({ transacoes, metas, recorrentes, setMetas, setRecorre
   const [salvandoRec, setSalvandoRec]       = useState(false);
   const [limpandoDupl, setLimpandoDupl]     = useState(false);
 
+  // ── Toggles com animação ────────────────────────────────────────────────
+  function toggleMeta() {
+    LayoutAnimation.configureNext(LAYOUT_ANIM);
+    setShowMetaForm(v => !v);
+  }
+
+  function toggleRec() {
+    LayoutAnimation.configureNext(LAYOUT_ANIM);
+    setShowRecForm(v => !v);
+  }
+
   // ── Dados do mês atual ──────────────────────────────────────────────────
   const txAtual = transacoes.filter(t => {
     const p = t.data?.split('/');
@@ -85,6 +108,7 @@ export function TelaMetas({ transacoes, metas, recorrentes, setMetas, setRecorre
       if (error) throw error;
       const novas = [...metas, data[0]];
       setMetas(novas); setMetaVal('');
+      LayoutAnimation.configureNext(LAYOUT_ANIM);
       setShowMetaForm(false);
       calcularAlertas(transacoes, novas);
       mostrarToast('Meta salva!');
@@ -120,6 +144,7 @@ export function TelaMetas({ transacoes, metas, recorrentes, setMetas, setRecorre
       if (error) throw error;
       setRecorrentes([...recorrentes, data[0]]);
       setRecDesc(''); setRecVal(''); setRecParcelas(''); setRecEhParcelado(false);
+      LayoutAnimation.configureNext(LAYOUT_ANIM);
       setShowRecForm(false);
       mostrarToast('Recorrente adicionada!');
     } catch (err: any) {
@@ -200,7 +225,7 @@ export function TelaMetas({ transacoes, metas, recorrentes, setMetas, setRecorre
           </View>
           <TouchableOpacity
             style={[s.addBtn, showMetaForm && s.addBtnActive]}
-            onPress={() => setShowMetaForm(v => !v)}
+            onPress={toggleMeta}
           >
             {showMetaForm
               ? <ChevronUp  size={14} color={C.primaryDark} strokeWidth={2.5} />
@@ -376,7 +401,7 @@ export function TelaMetas({ transacoes, metas, recorrentes, setMetas, setRecorre
           )}
           <TouchableOpacity
             style={[s.addBtn, showRecForm && s.addBtnActive]}
-            onPress={() => setShowRecForm(v => !v)}
+            onPress={toggleRec}
           >
             {showRecForm
               ? <ChevronUp size={14} color={C.primaryDark} strokeWidth={2.5} />
