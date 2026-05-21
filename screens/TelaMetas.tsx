@@ -23,7 +23,7 @@ import { CATEGORIAS, MESES, CONTA_TIPOS, CONTA_CORES } from '../constants';
 import { CatIcon } from '../constants/catIcons';
 import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, confirmar } from '../utils/format';
-import type { Transacao, Meta, Recorrente, Tipo, Conta } from '../types';
+import type { Transacao, Meta, Recorrente, Tipo, Conta, Categoria } from '../types';
 import { RADIUS, SHADOW, SPACE, TYPE } from '../theme/tokens';
 
 type Props = {
@@ -31,22 +31,31 @@ type Props = {
   metas: Meta[];
   recorrentes: Recorrente[];
   contas: Conta[];
+  categoriasCustom: Categoria[];
   setMetas: React.Dispatch<React.SetStateAction<Meta[]>>;
   setRecorrentes: React.Dispatch<React.SetStateAction<Recorrente[]>>;
   setContas: React.Dispatch<React.SetStateAction<Conta[]>>;
+  setCategoriasCustom: React.Dispatch<React.SetStateAction<Categoria[]>>;
   calcularAlertas: (txs: Transacao[], mts: Meta[]) => void;
   mostrarToast: (msg: string) => void;
 };
 
-export function TelaMetas({ transacoes, metas, recorrentes, contas, setMetas, setRecorrentes, setContas, calcularAlertas, mostrarToast }: Props) {
+export function TelaMetas({ transacoes, metas, recorrentes, contas, categoriasCustom, setMetas, setRecorrentes, setContas, setCategoriasCustom, calcularAlertas, mostrarToast }: Props) {
   const hoje = new Date();
   const { C } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
 
   // Formulários colapsáveis
-  const [showMetaForm, setShowMetaForm]   = useState(false);
-  const [showRecForm,  setShowRecForm]    = useState(false);
+  const [showMetaForm,  setShowMetaForm]  = useState(false);
+  const [showRecForm,   setShowRecForm]   = useState(false);
   const [showContaForm, setShowContaForm] = useState(false);
+  const [showCatForm,   setShowCatForm]   = useState(false);
+
+  // Categoria form
+  const [catNome,     setCatNome]     = useState('');
+  const [catIcone,    setCatIcone]    = useState('');
+  const [catCor,      setCatCor]      = useState(CONTA_CORES[0]);
+  const [salvandoCat, setSalvandoCat] = useState(false);
 
   // Conta form
   const [contaNome,       setContaNome]       = useState('');
@@ -88,6 +97,41 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, setMetas, se
   function toggleConta() {
     LayoutAnimation.configureNext(LAYOUT_ANIM);
     setShowContaForm(v => !v);
+  }
+
+  function toggleCat() {
+    LayoutAnimation.configureNext(LAYOUT_ANIM);
+    setShowCatForm(v => !v);
+  }
+
+  async function adicionarCategoria() {
+    if (!catNome.trim())  { mostrarToast('Informe o nome da categoria.'); return; }
+    if (!catIcone.trim()) { mostrarToast('Informe um emoji para a categoria.'); return; }
+    setSalvandoCat(true);
+    try {
+      const { data, error } = await supabase.from('categorias').insert({
+        nome: catNome.trim(), icone: catIcone.trim(), cor: catCor, ativo: true,
+      }).select();
+      if (error) throw error;
+      setCategoriasCustom([...categoriasCustom, data[0]]);
+      setCatNome(''); setCatIcone(''); setCatCor(CONTA_CORES[0]);
+      LayoutAnimation.configureNext(LAYOUT_ANIM);
+      setShowCatForm(false);
+      mostrarToast('Categoria criada!');
+    } catch (err: any) {
+      mostrarToast(`Erro ao salvar categoria: ${err.message ?? 'tente novamente'}`);
+    } finally {
+      setSalvandoCat(false);
+    }
+  }
+
+  async function removerCategoria(id: string) {
+    confirmar('Remover categoria', 'Esta categoria será removida. Lançamentos existentes mantêm o nome.', async () => {
+      const { error } = await supabase.from('categorias').update({ ativo: false }).eq('id', id);
+      if (error) { mostrarToast(`Erro: ${error.message}`); return; }
+      setCategoriasCustom(categoriasCustom.filter(c => c.id !== id));
+      mostrarToast('Categoria removida.');
+    });
   }
 
   // ── Saldo calculado por conta ───────────────────────────────────────────
@@ -519,6 +563,109 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, setMetas, se
       </View>
         );
       })()}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          SEÇÃO 0b — CATEGORIAS
+      ══════════════════════════════════════════════════════════════════ */}
+      <View style={s.section}>
+        <View style={s.sectionHeader}>
+          <View>
+            <Text style={s.sectionTitle}>Minhas categorias</Text>
+            <Text style={s.sectionSub}>
+              {categoriasCustom.length === 0
+                ? `${CATEGORIAS.length} categorias padrão`
+                : `${CATEGORIAS.length} padrão + ${categoriasCustom.length} personalizada${categoriasCustom.length > 1 ? 's' : ''}`
+              }
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[s.addBtn, showCatForm && s.addBtnActive]}
+            onPress={toggleCat}
+          >
+            {showCatForm
+              ? <ChevronUp size={14} color={C.primaryDark} strokeWidth={2.5} />
+              : <Plus      size={14} color={C.primaryDark} strokeWidth={2.5} />
+            }
+            <Text style={s.addBtnText}>{showCatForm ? 'Cancelar' : 'Nova'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Chips das categorias padrão */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: categoriasCustom.length > 0 ? 10 : 0 }}>
+          {CATEGORIAS.map(c => (
+            <View key={c} style={s.catChip}>
+              <CatIcon categoria={c} size={11} color={C.label} strokeWidth={2} />
+              <Text style={s.catChipText}>{c}</Text>
+            </View>
+          ))}
+        </ScrollView>
+
+        {/* Lista de categorias personalizadas */}
+        {categoriasCustom.map(c => (
+          <View key={c.id} style={[s.recItem, { borderLeftWidth: 3, borderLeftColor: c.cor }]}>
+            <View style={[s.recIcone, { backgroundColor: c.cor + '22' }]}>
+              <Text style={{ fontSize: 18 }}>{c.icone}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.recDesc}>{c.nome}</Text>
+              <Text style={s.recMeta}>Personalizada</Text>
+            </View>
+            <TouchableOpacity onPress={() => removerCategoria(c.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Trash2 size={14} color={C.textLight} strokeWidth={1.8} />
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        {/* Formulário colapsável — nova categoria */}
+        {showCatForm && (
+          <View style={s.inlineForm}>
+            <View style={s.formDivider} />
+
+            <Text style={s.formFieldLabel}>Nome</Text>
+            <TextInput
+              style={s.input}
+              placeholder="Ex: Academia, Pets, Streaming..."
+              placeholderTextColor={C.textLight}
+              value={catNome}
+              onChangeText={setCatNome}
+            />
+
+            <Text style={s.formFieldLabel}>Ícone (emoji)</Text>
+            <TextInput
+              style={s.input}
+              placeholder="🏋️"
+              placeholderTextColor={C.textLight}
+              value={catIcone}
+              onChangeText={setCatIcone}
+            />
+
+            <Text style={s.formFieldLabel}>Cor</Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+              {CONTA_CORES.map(cor => (
+                <TouchableOpacity
+                  key={cor}
+                  onPress={() => setCatCor(cor)}
+                  style={{
+                    width: 28, height: 28, borderRadius: 14,
+                    backgroundColor: cor,
+                    borderWidth: catCor === cor ? 3 : 0,
+                    borderColor: C.text,
+                    transform: [{ scale: catCor === cor ? 1.15 : 1 }],
+                  }}
+                />
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[s.ctaBtn, { opacity: salvandoCat ? 0.6 : 1 }]}
+              onPress={adicionarCategoria}
+              disabled={salvandoCat}
+            >
+              <Text style={s.ctaBtnText}>{salvandoCat ? 'Salvando...' : 'Salvar categoria'}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
 
       {/* ══════════════════════════════════════════════════════════════════
           SEÇÃO 1 — METAS DO MÊS
@@ -957,6 +1104,16 @@ function makeStyles(C: ColorPalette) {
     emptySectionSub: {
       fontSize: 12, color: C.textLight, textAlign: 'center', lineHeight: 18,
     },
+
+    // ── Categorias chips ────────────────────────────────────────────────
+    catChip: {
+      flexDirection: 'row' as const, alignItems: 'center' as const, gap: 5,
+      paddingHorizontal: 10, paddingVertical: 5,
+      borderRadius: RADIUS.full, borderWidth: 0.5,
+      borderColor: C.border, marginRight: 6,
+      backgroundColor: C.bg,
+    },
+    catChipText: { fontSize: 11, color: C.label },
 
     // ── Metas ───────────────────────────────────────────────────────────
     metaItem: {

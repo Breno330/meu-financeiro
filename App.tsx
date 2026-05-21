@@ -16,7 +16,7 @@ import { ThemeProvider, useTheme, type ColorPalette } from './contexts/ThemeCont
 import { useToast } from './hooks/useToast';
 import { useBreakpoint } from './hooks/useBreakpoint';
 import { T } from './components/T';
-import type { Transacao, Meta, Recorrente, Aba, Conta } from './types';
+import type { Transacao, Meta, Recorrente, Aba, Conta, Categoria } from './types';
 import { RADIUS, SPACE } from './theme/tokens';
 
 import { TelaLogin } from './screens/TelaLogin';
@@ -24,6 +24,7 @@ import { TelaLancamentos } from './screens/TelaLancamentos';
 import { TelaResumo } from './screens/TelaResumo';
 import { TelaMetas } from './screens/TelaMetas';
 import { TelaImportar } from './screens/TelaImportar';
+import { Onboarding } from './components/Onboarding';
 
 // ── Raiz: injeta ThemeProvider ───────────────────────────────────────────────
 
@@ -68,9 +69,27 @@ function AppInner() {
   const [metas, setMetas] = useState<Meta[]>([]);
   const [recorrentes, setRecorrentes] = useState<Recorrente[]>([]);
   const [contas, setContas] = useState<Conta[]>([]);
+  const [categoriasCustom, setCategoriasCustom] = useState<Categoria[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [alertas, setAlertas] = useState<string[]>([]);
   const [showAlertas, setShowAlertas] = useState(false);
+
+  // ── Onboarding ──────────────────────────────────────────────────────────────
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (!session) return;
+    const key = `onboarding_${session.user.id}`;
+    const done = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+    if (!done) setShowOnboarding(true);
+  }, [session?.user?.id]);
+
+  function dismissOnboarding() {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`onboarding_${session?.user?.id}`, '1');
+    }
+    setShowOnboarding(false);
+  }
 
   // ── Mês/ano compartilhado entre Lançamentos e Resumo ───────────────────────
   const [mesSel, setMesSel] = useState(hoje.getMonth());
@@ -118,18 +137,20 @@ function AppInner() {
   async function carregarTudo() {
     setCarregando(true);
     try {
-      const [r1, r2, r3, r4] = await Promise.all([
+      const [r1, r2, r3, r4, r5] = await Promise.all([
         supabase.from('transacoes').select('*').order('criado_em', { ascending: false }),
         supabase.from('metas').select('*'),
         supabase.from('recorrentes').select('*').eq('ativo', true),
         supabase.from('contas').select('*').eq('ativo', true).order('criado_em', { ascending: true }),
+        supabase.from('categorias').select('*').eq('ativo', true).order('criado_em', { ascending: true }),
       ]);
 
       if (r1.error) throw new Error(`Transações: ${r1.error.message}`);
       if (r2.error) throw new Error(`Metas: ${r2.error.message}`);
       if (r3.error) throw new Error(`Recorrentes: ${r3.error.message}`);
-      // contas: falha silenciosa se tabela ainda não existe
+      // contas e categorias: falha silenciosa se tabela ainda não existe
       if (!r4.error) setContas(r4.data || []);
+      if (!r5.error) setCategoriasCustom(r5.data || []);
 
       let todasTx: Transacao[] = r1.data || [];
       const todasMetas: Meta[] = r2.data || [];
@@ -325,6 +346,7 @@ function AppInner() {
             {aba === 'lancamentos' && (
               <TelaLancamentos
                 transacoes={transacoes} metas={metas} contas={contas}
+                categoriasCustom={categoriasCustom}
                 setTransacoes={setTransacoes} calcularAlertas={calcularAlertas}
                 mostrarToast={mostrarToast} carregando={carregando}
                 mesSel={mesSel} anoSel={anoSel} navMes={navMes}
@@ -341,6 +363,7 @@ function AppInner() {
               <TelaMetas
                 transacoes={transacoes} metas={metas} recorrentes={recorrentes}
                 contas={contas} setContas={setContas}
+                categoriasCustom={categoriasCustom} setCategoriasCustom={setCategoriasCustom}
                 setMetas={setMetas} setRecorrentes={setRecorrentes}
                 calcularAlertas={calcularAlertas} mostrarToast={mostrarToast}
               />
@@ -355,6 +378,9 @@ function AppInner() {
           </Animated.View>
         </View>
       </View>
+
+      {/* Onboarding */}
+      <Onboarding visible={showOnboarding} onDismiss={dismissOnboarding} />
 
       {/* Toast — sempre montado, animado via opacity + translateY */}
       <Animated.View

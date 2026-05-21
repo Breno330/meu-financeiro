@@ -22,13 +22,14 @@ import { CatIcon } from '../constants/catIcons';
 import { useTheme, type ColorPalette } from '../contexts/ThemeContext';
 import { fmt, fmtSaldo, saudacao, confirmar } from '../utils/format';
 import { useBreakpoint } from '../hooks/useBreakpoint';
-import type { Transacao, Meta, Tipo, Conta } from '../types';
+import type { Transacao, Meta, Tipo, Conta, Categoria } from '../types';
 import { RADIUS, SHADOW, SPACE, TYPE } from '../theme/tokens';
 
 type Props = {
   transacoes: Transacao[];
   metas: Meta[];
   contas: Conta[];
+  categoriasCustom: Categoria[];
   setTransacoes: React.Dispatch<React.SetStateAction<Transacao[]>>;
   calcularAlertas: (txs: Transacao[], mts: Meta[]) => void;
   mostrarToast: (msg: string) => void;
@@ -38,11 +39,24 @@ type Props = {
   navMes: (delta: number) => void;
 };
 
-export function TelaLancamentos({ transacoes, metas, contas, setTransacoes, calcularAlertas, mostrarToast, carregando, mesSel, anoSel, navMes }: Props) {
+export function TelaLancamentos({ transacoes, metas, contas, categoriasCustom, setTransacoes, calcularAlertas, mostrarToast, carregando, mesSel, anoSel, navMes }: Props) {
   const hoje = new Date();
   const { heroFontSize, statCardWidth, isMobile, isDesktop, showRightPanel, rightPanelWidth } = useBreakpoint();
   const { C } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
+
+  // Lista completa de categorias (padrão + personalizadas)
+  const todasCategorias = useMemo(
+    () => [...CATEGORIAS, ...categoriasCustom.map(c => c.nome)],
+    [categoriasCustom]
+  );
+
+  // Helper: renderiza ícone de categoria (CatIcon para padrão, emoji para custom)
+  function renderCatIcone(catNome: string, size: number, color: string) {
+    const custom = categoriasCustom.find(c => c.nome === catNome);
+    if (custom) return <Text style={{ fontSize: size - 2 }}>{custom.icone}</Text>;
+    return <CatIcon categoria={catNome} size={size} color={color} strokeWidth={1.8} />;
+  }
 
   // Filtros — mês/ano vêm de props (compartilhado com TelaResumo via App.tsx)
   const filtroMes = mesSel;
@@ -280,12 +294,7 @@ export function TelaLancamentos({ transacoes, metas, contas, setTransacoes, calc
         onMouseLeave={isDesktop ? () => setHoveredId(null) : undefined}
       >
         <View style={[s.txIcone, { backgroundColor: t.tipo === 'receita' ? C.receitaBg : C.despesaBg }]}>
-          <CatIcon
-            categoria={t.categoria}
-            size={18}
-            color={t.tipo === 'receita' ? C.receita : C.despesa}
-            strokeWidth={1.8}
-          />
+          {renderCatIcone(t.categoria, 18, t.tipo === 'receita' ? C.receita : C.despesa)}
         </View>
         <View style={s.txInfo}>
           <Text style={s.txDesc}>{t.descricao}</Text>
@@ -355,10 +364,10 @@ export function TelaLancamentos({ transacoes, metas, contas, setTransacoes, calc
                 </TouchableOpacity>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[s.catScroll, { marginBottom: 12 }]}>
-                {CATEGORIAS.map(c => (
+                {todasCategorias.map(c => (
                   <TouchableOpacity key={c} style={[s.catBtn, editCat === c && { backgroundColor: C.brand, borderColor: C.brand }]} onPress={() => setEditCat(c)}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                      <CatIcon categoria={c} size={12} color={editCat === c ? C.primaryDark : C.label} strokeWidth={2} />
+                      {renderCatIcone(c, 12, editCat === c ? C.primaryDark : C.label)}
                       <Text style={[s.catBtnText, editCat === c && { color: C.primaryDark }]}>{c}</Text>
                     </View>
                   </TouchableOpacity>
@@ -427,10 +436,10 @@ export function TelaLancamentos({ transacoes, metas, contas, setTransacoes, calc
                 </TouchableOpacity>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.catScroll}>
-                {CATEGORIAS.map(c => (
+                {todasCategorias.map(c => (
                   <TouchableOpacity key={c} style={[s.catBtn, cat === c && { backgroundColor: C.brand, borderColor: C.brand }]} onPress={() => setCat(c)}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                      <CatIcon categoria={c} size={12} color={cat === c ? C.primaryDark : C.label} strokeWidth={2} />
+                      {renderCatIcone(c, 12, cat === c ? C.primaryDark : C.label)}
                       <Text style={[s.catBtnText, cat === c && { color: C.primaryDark }]}>{c}</Text>
                     </View>
                   </TouchableOpacity>
@@ -700,7 +709,7 @@ export function TelaLancamentos({ transacoes, metas, contas, setTransacoes, calc
                     <View key={cat} style={{ marginBottom: 16 }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <CatIcon categoria={cat} size={13} color={CORES_CAT[cat] || C.label} strokeWidth={2} />
+                          {renderCatIcone(cat, 13, CORES_CAT[cat] || C.label)}
                           <Text style={{ fontSize: 13, color: C.text }}>{cat}</Text>
                         </View>
                         <Text style={{ fontSize: 12, fontWeight: '600', color: C.text }}>{fmt(val)}</Text>

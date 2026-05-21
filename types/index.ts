@@ -36,6 +36,14 @@ export type Meta = {
   ano: number;
 };
 
+export type Categoria = {
+  id: string;
+  nome: string;
+  icone: string;
+  cor: string;
+  ativo: boolean;
+};
+
 export type Recorrente = {
   id: string;
   descricao: string;
