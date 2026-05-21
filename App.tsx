@@ -229,8 +229,8 @@ function AppInner() {
       {/* ── Layout com sidebar web ── */}
       <View style={{ flex: 1, flexDirection: 'row' }}>
 
-        {/* Sidebar — só web */}
-        {Platform.OS === 'web' && (
+        {/* Sidebar — web tablet/desktop (≥640 px) */}
+        {Platform.OS === 'web' && !isMobile && (
           <View style={[s.sidebar, { width: sidebarWidth }]}>
 
             {/* Logo + toggle de tema */}
@@ -363,8 +363,8 @@ function AppInner() {
         <T style={s.toastText}>{toastMsg}</T>
       </Animated.View>
 
-      {/* Tab bar — só mobile */}
-      {Platform.OS !== 'web' && (
+      {/* Tab bar — nativo + mobile web (<640 px) */}
+      {(Platform.OS !== 'web' || isMobile) && (
         <View style={s.tabBar}>
           {TABS.map(({ key, Icon, label }) => {
             const active = aba === key;
