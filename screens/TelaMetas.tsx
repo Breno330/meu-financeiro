@@ -550,17 +550,17 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, categoriasCu
                   <View style={{ height: 6, borderRadius: 3, backgroundColor: barColor, width: `${Math.round(pctFatura * 100)}%` as any }} />
                 </View>
                 {/* Números */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <View>
-                    <Text style={{ fontSize: 10, color: C.textLight }}>Fatura</Text>
+                <View style={{ flexDirection: 'row' }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 10, color: C.textLight, marginBottom: 2 }}>Fatura</Text>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: C.despesa }}>{fmt(fatura)}</Text>
                   </View>
-                  <View style={{ alignItems: 'center' }}>
-                    <Text style={{ fontSize: 10, color: C.textLight }}>Limite</Text>
+                  <View style={{ flex: 1, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 10, color: C.textLight, marginBottom: 2 }}>Limite</Text>
                     <Text style={{ fontSize: 13, fontWeight: '600', color: C.label }}>{fmt(limite)}</Text>
                   </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ fontSize: 10, color: C.textLight }}>Disponível</Text>
+                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 10, color: C.textLight, marginBottom: 2 }}>Disponível</Text>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: C.receita }}>{fmt(disponivel)}</Text>
                   </View>
                 </View>
