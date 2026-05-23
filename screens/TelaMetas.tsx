@@ -527,41 +527,49 @@ export function TelaMetas({ transacoes, metas, recorrentes, contas, categoriasCu
             const pctFatura = limite > 0 ? Math.min(fatura / limite, 1) : 0;
             const barColor  = pctFatura > 0.9 ? C.despesa : pctFatura > 0.7 ? '#F59E0B' : C.receita;
             return (
-              <View key={c.id} style={[s.recItem, { borderLeftWidth: 3, borderLeftColor: c.cor, flexDirection: 'column', gap: 0 }]}>
-                {/* Header */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                  <View style={[s.recIcone, { backgroundColor: c.cor + '22' }]}>
-                    <Text style={{ fontSize: 18 }}>💳</Text>
+              <View key={c.id} style={s.cartaoCard}>
+                {/* Tarja colorida lateral */}
+                <View style={{ width: 4, backgroundColor: c.cor, borderRadius: 2, alignSelf: 'stretch', marginRight: 14 }} />
+
+                {/* Conteúdo */}
+                <View style={{ flex: 1 }}>
+                  {/* Header: ícone + nome + lixeira */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                    <View style={[s.recIcone, { backgroundColor: c.cor + '22' }]}>
+                      <Text style={{ fontSize: 18 }}>💳</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.recDesc}>{c.nome}</Text>
+                      <Text style={s.recMeta}>
+                        Cartão de Crédito
+                        {c.dia_fechamento ? `  ·  fecha dia ${c.dia_fechamento}` : ''}
+                        {c.dia_vencimento ? `  ·  vence dia ${c.dia_vencimento}` : ''}
+                      </Text>
+                    </View>
+                    <TouchableOpacity onPress={() => removerConta(c.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Trash2 size={14} color={C.textLight} strokeWidth={1.8} />
+                    </TouchableOpacity>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.recDesc}>{c.nome}</Text>
-                    <Text style={s.recMeta}>
-                      Cartão de Crédito
-                      {c.dia_fechamento ? `  ·  fecha dia ${c.dia_fechamento}` : ''}
-                      {c.dia_vencimento ? `  ·  vence dia ${c.dia_vencimento}` : ''}
-                    </Text>
+
+                  {/* Barra fatura/limite */}
+                  <View style={{ height: 6, backgroundColor: C.bgAccent, borderRadius: 3, overflow: 'hidden', marginBottom: 10 }}>
+                    <View style={{ height: 6, borderRadius: 3, backgroundColor: barColor, width: `${Math.round(pctFatura * 100)}%` as any }} />
                   </View>
-                  <TouchableOpacity onPress={() => removerConta(c.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Trash2 size={14} color={C.textLight} strokeWidth={1.8} />
-                  </TouchableOpacity>
-                </View>
-                {/* Barra fatura/limite */}
-                <View style={{ height: 6, backgroundColor: C.bgAccent, borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
-                  <View style={{ height: 6, borderRadius: 3, backgroundColor: barColor, width: `${Math.round(pctFatura * 100)}%` as any }} />
-                </View>
-                {/* Números */}
-                <View style={{ flexDirection: 'row' }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 10, color: C.textLight, marginBottom: 2 }}>Fatura</Text>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: C.despesa }}>{fmt(fatura)}</Text>
-                  </View>
-                  <View style={{ flex: 1, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 10, color: C.textLight, marginBottom: 2 }}>Limite</Text>
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: C.label }}>{fmt(limite)}</Text>
-                  </View>
-                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <Text style={{ fontSize: 10, color: C.textLight, marginBottom: 2 }}>Disponível</Text>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: C.receita }}>{fmt(disponivel)}</Text>
+
+                  {/* Três métricas */}
+                  <View style={{ flexDirection: 'row' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.cartaoLabel}>Fatura</Text>
+                      <Text style={[s.cartaoValor, { color: C.despesa }]}>{fmt(fatura)}</Text>
+                    </View>
+                    <View style={{ flex: 1, alignItems: 'center' }}>
+                      <Text style={s.cartaoLabel}>Limite</Text>
+                      <Text style={[s.cartaoValor, { color: C.label }]}>{fmt(limite)}</Text>
+                    </View>
+                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                      <Text style={s.cartaoLabel}>Disponível</Text>
+                      <Text style={[s.cartaoValor, { color: C.receita }]}>{fmt(disponivel)}</Text>
+                    </View>
                   </View>
                 </View>
               </View>
@@ -1584,6 +1592,28 @@ function makeStyles(C: ColorPalette) {
     },
     metaLabel: { fontSize: 13, fontWeight: '600', color: C.text },
     metaLabelSub: { fontSize: 11, color: C.label, marginTop: 1 },
+
+    // ── Cartão de crédito ────────────────────────────────────────────────
+    cartaoCard: {
+      flexDirection: 'row',
+      backgroundColor: C.bg,
+      borderRadius: 12,
+      padding: SPACE.md,
+      marginBottom: 8,
+      borderWidth: 0.5,
+      borderColor: C.borderLight,
+    },
+    cartaoLabel: {
+      fontSize: 10,
+      color: C.textLight,
+      marginBottom: 3,
+      textTransform: 'uppercase' as const,
+      letterSpacing: 0.3,
+    },
+    cartaoValor: {
+      fontSize: 14,
+      fontWeight: '700' as const,
+    },
 
     // ── Recorrentes ──────────────────────────────────────────────────────
     recItem: {
